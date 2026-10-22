@@ -1,0 +1,6 @@
+{
+  "askBeforeRunning": true,
+  "operations": [
+    { "type": "renameLayer", "from": "DIFF", "to": "DIFF2" }
+  ]
+}
