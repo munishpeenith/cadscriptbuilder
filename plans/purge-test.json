@@ -1,0 +1,6 @@
+{
+  "askBeforeRunning": true,
+  "operations": [
+    { "type": "purgeLayer", "layer": "CBS-test" }
+  ]
+}

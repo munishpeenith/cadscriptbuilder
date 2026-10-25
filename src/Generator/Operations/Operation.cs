@@ -4,6 +4,7 @@ namespace Generator;
 
 [JsonPolymorphic(TypeDiscriminatorPropertyName = "type")]
 [JsonDerivedType(typeof(RenameLayer), "renameLayer")]
+[JsonDerivedType(typeof(PurgeLayer), "purgeLayer")]
 public abstract class Operation
 {
     public abstract string Describe();
