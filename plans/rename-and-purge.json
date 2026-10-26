@@ -1,7 +1,7 @@
 {
   "askBeforeRunning": true,
   "operations": [
-    { "type": "renameLayer", "from": "DIFF", "to": "DIFF2" },
+    { "type": "renameLayer", "from": "DIFF2", "to": "DIFF" },
     { "type": "purgeLayer", "layer": "CBS-test" }
   ]
 }
