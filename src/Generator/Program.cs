@@ -2,6 +2,12 @@
 using System.Text.Json;
 using Generator;
 
+// Remove any old output first, so a failed run can't leave a stale script behind
+if (File.Exists(args[1]))
+{
+    File.Delete(args[1]);
+}
+
 if (args.Length < 2)
 {
     Console.WriteLine("Usage: Generator <plan file> <output .lsp> [scan file]");
