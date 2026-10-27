@@ -3,4 +3,4 @@ obj/
 .vs/
 out/
 src/layers.txt
-publish/
+publish/*.zip
