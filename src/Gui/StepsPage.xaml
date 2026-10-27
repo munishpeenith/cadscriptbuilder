@@ -79,8 +79,8 @@
                     BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}"
                     BorderThickness="1"
                     CornerRadius="8">
-                <ListView x:Name="StepsList" Margin="4">
-                    <ListView.ItemTemplate>
+                <ui:ListView x:Name="StepsList" Margin="4" Background="Transparent" BorderThickness="0">
+                    <ui:ListView.ItemTemplate>
                         <DataTemplate>
                             <StackPanel Margin="4,6" Orientation="Horizontal">
                                 <ui:SymbolIcon Margin="0,0,12,0"
@@ -94,8 +94,8 @@
                                            Text="{Binding Text}" />
                             </StackPanel>
                         </DataTemplate>
-                    </ListView.ItemTemplate>
-                </ListView>
+                    </ui:ListView.ItemTemplate>
+                </ui:ListView>
             </Border>
         </Grid>
 
