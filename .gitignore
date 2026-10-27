@@ -3,3 +3,4 @@ obj/
 .vs/
 out/
 src/layers.txt
+publish/
