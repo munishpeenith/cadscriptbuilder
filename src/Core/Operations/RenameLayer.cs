@@ -9,24 +9,32 @@ public class RenameLayer : Operation
 
     public override string ToLisp() => $"""(command "-RENAME" "LAyer" "{From}" "{To}")""";
 
-    public override List<string> Check(HashSet<string> layers)
+    public override List<string> Check(DrawingState drawing)
     {
-    var problems = new List<string>();
+        var problems = new List<string>();
+        var nameProblem = LayerRules.NameProblem(To);
 
-    if (!layers.Contains(From))
+        if (!drawing.HasLayer(From))
         {
-        problems.Add($"Can't rename {From}: there's no layer called {From}");
+            problems.Add($"Can't rename {From}: there's no layer called {From}");
         }
-    else if (layers.Contains(To))
+        else if (LayerRules.IsProtected(From))
         {
-        problems.Add($"Can't rename {From} to {To}: {To} already exists");
+            problems.Add($"Can't rename {From}: AutoCAD doesn't allow it");
         }
-    else
+        else if (nameProblem is not null)
         {
-        layers.Remove(From);
-        layers.Add(To);
+            problems.Add($"Can't rename {From}: {nameProblem}");
+        }
+        else if (drawing.HasLayer(To))
+        {
+            problems.Add($"Can't rename {From} to {To}: {To} already exists");
+        }
+        else
+        {
+            drawing.RenameLayer(From, To);
         }
 
-    return problems;
+        return problems;
     }
 }

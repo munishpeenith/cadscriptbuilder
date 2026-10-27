@@ -52,19 +52,44 @@ public static class Engine
             throw new InvalidDataException("The scan file is empty.");
         }
 
-        var layers = new HashSet<string>(lines.Skip(1), StringComparer.OrdinalIgnoreCase);
-        return new Scan(lines[0], layers);
+        var layers = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var frozen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var linetypes = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        string? current = null;
+
+        // Lines starting with * are extra info (layer names can't contain *)
+        foreach (var line in lines.Skip(1))
+        {
+            if (line.StartsWith("*current="))
+            {
+                current = line["*current=".Length..];
+            }
+            else if (line.StartsWith("*frozen="))
+            {
+                frozen.Add(line["*frozen=".Length..]);
+            }
+            else if (line.StartsWith("*linetype="))
+            {
+                linetypes.Add(line["*linetype=".Length..]);
+            }
+            else if (line != "")
+            {
+                layers.Add(line);
+            }
+        }
+
+        return new Scan(lines[0], layers, current, frozen, linetypes);
     }
 
     public static List<string> Check(Plan plan, Scan scan)
     {
-        // Work on a copy, so checking never changes the scan itself
-        var layers = new HashSet<string>(scan.Layers, StringComparer.OrdinalIgnoreCase);
+        // Work on a pretend copy, so checking never changes the scan itself
+        var drawing = new DrawingState(scan);
 
         var problems = new List<string>();
         foreach (var op in plan.Operations)
         {
-            problems.AddRange(op.Check(layers));
+            problems.AddRange(op.Check(drawing));
         }
         return problems;
     }
@@ -76,7 +101,7 @@ public static class Engine
 
         foreach (var op in plan.Operations)
         {
-            lisp.AppendLine($"""  (princ "\n{op.Describe()}")""");
+            lisp.AppendLine($"""  (princ "\n{Lisp.Escape(op.Describe())}")""");
         }
 
         lisp.AppendLine("""  (initget "Yes No")""");

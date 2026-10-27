@@ -1,0 +1,23 @@
+{
+  "askBeforeRunning": true,
+  "operations": [
+    { "type": "newLayer", "layer": "CSB-T2" },
+    { "type": "setLayerColour", "layer": "CSB-T2", "colour": "3" },
+    { "type": "setLayerLinetype", "layer": "CSB-T2", "linetype": "Continuous" },
+    { "type": "setLayerLineweight", "layer": "CSB-T2", "lineweight": "0.25" },
+    { "type": "setLayerTransparency", "layer": "CSB-T2", "transparency": "30" },
+    { "type": "setLayerDescription", "layer": "CSB-T2", "description": "Made by CADScriptBuilder" },
+    { "type": "noPlotLayer", "layer": "CSB-T2" },
+    { "type": "plotLayer", "layer": "CSB-T2" },
+    { "type": "setCurrentLayer", "layer": "CSB-T2" },
+    { "type": "setCurrentLayer", "layer": "0" },
+    { "type": "lockLayer", "layer": "CSB-T2" },
+    { "type": "unlockLayer", "layer": "CSB-T2" },
+    { "type": "turnOffLayer", "layer": "CSB-T2" },
+    { "type": "turnOnLayer", "layer": "CSB-T2" },
+    { "type": "freezeLayer", "layer": "CSB-T2" },
+    { "type": "thawLayer", "layer": "CSB-T2" },
+    { "type": "renameLayer", "from": "CSB-T2", "to": "CSB-T3" },
+    { "type": "purgeLayer", "layer": "CSB-T3" }
+  ]
+}

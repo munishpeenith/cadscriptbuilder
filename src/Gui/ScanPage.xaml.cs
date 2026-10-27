@@ -21,7 +21,7 @@ public partial class ScanPage : UserControl
     // Where the scan script writes its results (the same path as inside the .lsp)
     private readonly string layersFile = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
-        "repos", "cadscriptbuilder", "src", "layers.txt");
+        "CADScriptBuilder", "layers.txt");
 
     private readonly FileSystemWatcher watcher;
     private readonly DispatcherTimer settleTimer = new() { Interval = TimeSpan.FromMilliseconds(500) };
@@ -40,6 +40,8 @@ public partial class ScanPage : UserControl
         watcher.EnableRaisingEvents = true;
 
         settleTimer.Tick += (sender, e) => ReadScan();
+
+        BuildSupportList();
     }
 
     // Let the user drag the scan script out of the app, like a file from Explorer
@@ -119,6 +121,88 @@ public partial class ScanPage : UserControl
         StatusIcon.Foreground = GetBrush("SystemFillColorCriticalBrush", Color.FromRgb(0xFF, 0x99, 0xA4));
         StatusText.Text = message;
         NextButton.IsEnabled = false;
+    }
+
+    // The "What CADScriptBuilder can do" list: ticks for what works now, clocks for what's coming.
+    // To update it, just edit the lists here.
+    private void BuildSupportList()
+    {
+        AddSection("Layers", done: true,
+            "Rename layers",
+            "Create new layers",
+            "Purge empty layers",
+            "Set the current layer",
+            "Freeze and thaw",
+            "Turn on and off",
+            "Lock and unlock",
+            "Set colour, linetype, lineweight and transparency",
+            "Set descriptions",
+            "Plot on and off");
+
+        AddSection("Safety", done: true,
+            "Every step checked against your drawing before anything is made",
+            "Preview of every change, then a Yes/No before it runs",
+            "One undo (U) reverses the whole script",
+            "Out-of-date scripts are removed automatically");
+
+        AddSection("Workflow", done: true,
+            "Drag-in scan that syncs with your drawing",
+            "Live ticks on every step",
+            "Layer search and dropdowns from your real layers",
+            "Drag-out script, straight into Civil 3D",
+            "Command line version that runs saved plans");
+
+        AddSection("Coming soon", done: false,
+            "Drag-and-drop block builder",
+            "Standards check (Uniclass, house and client naming)",
+            "AI mode: describe what you want in plain English",
+            "Civil 3D styles and label styles",
+            "Merge and delete layers",
+            "Summary of what changed after a run",
+            "Rescan button",
+            "Drawing cleanup: purge, audit, xrefs",
+            "Layouts and plotting",
+            "Direct connection to Civil 3D, no dragging",
+            "Automatic updates");
+    }
+
+    private void AddSection(string heading, bool done, params string[] items)
+    {
+        var title = new TextBlock
+        {
+            Text = heading,
+            FontSize = 13,
+            FontWeight = FontWeights.SemiBold,
+            Margin = new Thickness(0, 10, 0, 4)
+        };
+        title.SetResourceReference(TextBlock.ForegroundProperty, "TextFillColorPrimaryBrush");
+        SupportPanel.Children.Add(title);
+
+        var icon = done ? SymbolRegular.CheckmarkCircle24 : SymbolRegular.Clock24;
+        var iconColour = done
+            ? GetBrush("SystemFillColorSuccessBrush", Color.FromRgb(0x6C, 0xCB, 0x5F))
+            : GetBrush("TextFillColorSecondaryBrush", Color.FromRgb(0x9E, 0x9E, 0x9E));
+
+        foreach (var item in items)
+        {
+            var row = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 3, 0, 3) };
+
+            row.Children.Add(new Wpf.Ui.Controls.SymbolIcon
+            {
+                Symbol = icon,
+                FontSize = 16,
+                Foreground = iconColour,
+                Margin = new Thickness(0, 0, 10, 0),
+                VerticalAlignment = VerticalAlignment.Center
+            });
+
+            var text = new TextBlock { Text = item, FontSize = 13, VerticalAlignment = VerticalAlignment.Center };
+            text.SetResourceReference(TextBlock.ForegroundProperty,
+                done ? "TextFillColorPrimaryBrush" : "TextFillColorSecondaryBrush");
+            row.Children.Add(text);
+
+            SupportPanel.Children.Add(row);
+        }
     }
 
     // A colour from the current theme, or a fallback if the theme doesn't have it

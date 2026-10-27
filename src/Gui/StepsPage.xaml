@@ -27,19 +27,20 @@
         <ui:Card Grid.Row="1" Padding="16">
             <Grid>
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="140" />
+                    <ColumnDefinition Width="170" />
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
 
-                <ComboBox x:Name="BlockBox" Grid.Column="0">
-                    <ComboBoxItem Content="Rename layer" />
-                    <ComboBoxItem Content="Purge layer" />
-                </ComboBox>
+                <ComboBox x:Name="BlockBox" Grid.Column="0" MaxDropDownHeight="420" />
 
-                <ui:AutoSuggestBox x:Name="FirstBox" Grid.Column="1" Margin="8,0,0,0" />
-                <ui:TextBox x:Name="SecondBox" Grid.Column="2" Margin="8,0,0,0" PlaceholderText="To layer" />
+                <ui:AutoSuggestBox x:Name="FirstBox" Grid.Column="1" Margin="8,0,0,0"
+                                   Icon="{ui:SymbolIcon ChevronDown24}"
+                                   PreviewMouseLeftButtonUp="SuggestBox_Click" />
+                <ui:AutoSuggestBox x:Name="SecondBox" Grid.Column="2" Margin="8,0,0,0"
+                                   Icon="{ui:SymbolIcon ChevronDown24}"
+                                   PreviewMouseLeftButtonUp="SuggestBox_Click" />
 
                 <ui:Button x:Name="AddButton"
                            Grid.Column="3"

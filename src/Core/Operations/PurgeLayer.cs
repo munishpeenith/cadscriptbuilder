@@ -8,19 +8,27 @@ public class PurgeLayer : Operation
 
     public override string ToLisp() => $"""(command "-PURGE" "LA" "{Layer}" "N")""";
 
-    public override List<string> Check(HashSet<string> layers)
+    public override List<string> Check(DrawingState drawing)
     {
-    var problems = new List<string>();
+        var problems = new List<string>();
 
-    if (!layers.Contains(Layer))
+        if (!drawing.HasLayer(Layer))
         {
-        problems.Add($"Can't purge {Layer}: there's no layer called {Layer}");
+            problems.Add($"Can't purge {Layer}: there's no layer called {Layer}");
         }
-    else
+        else if (LayerRules.IsProtected(Layer))
         {
-        layers.Remove(Layer);
+            problems.Add($"Can't purge {Layer}: AutoCAD doesn't allow it");
+        }
+        else if (drawing.IsCurrent(Layer))
+        {
+            problems.Add($"Can't purge {Layer}: it's the current layer");
+        }
+        else
+        {
+            drawing.RemoveLayer(Layer);
         }
 
-    return problems;
+        return problems;
     }
 }
