@@ -164,6 +164,8 @@ public partial class ScanPage : UserControl
 
         AddSection("Workflow", done: true,
             "Drag-in scan that syncs with your drawing",
+            "Re-syncs with the drawing by itself after every run",
+            "Refresh button for changes made by hand",
             "Change drawing without losing your steps",
             "Dropdowns that only show layers that make sense for the block",
             "Select several layers at once, in the order you tick them",

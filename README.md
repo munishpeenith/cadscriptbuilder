@@ -21,6 +21,8 @@ blocks.
   - Every step is checked against the drawing as it will be after the steps before it:
     ✔ fine, ⚠ heads up (runs, but changes nothing), ✖ can't work (held back, *Add anyway* if meant).
   - Drag steps to reorder, Delete to remove, double-click to edit, Clear all.
+  - Stays in sync: every script rescans the drawing after it runs, and the ↻ button gives a mini
+    SCAN tile for changes made by hand.
   - Save plans and open them on other drawings; change drawing without losing your steps.
   - *Generate* makes a RUN tile you drag straight into Civil 3D.
   - Pin to keep it on top of Civil 3D; snaps side by side.

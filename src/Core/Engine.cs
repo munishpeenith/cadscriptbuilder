@@ -127,9 +127,40 @@ public static class Engine
         return result;
     }
 
+    // A copy of the scan (same as lsp/07), run at the end of every script so the app
+    // re-syncs with the drawing as soon as the changes are made
+    private const string RescanLisp = """
+        (defun csb-rescan ( / path f lay name flags)
+          (vl-mkdir (strcat (getvar "MYDOCUMENTSPREFIX") "\\CADScriptBuilder"))
+          (setq path (strcat (getvar "MYDOCUMENTSPREFIX") "\\CADScriptBuilder\\layers.txt"))
+          (setq f (open path "w"))
+          (if f
+            (progn
+              (write-line (getvar "DWGNAME") f)
+              (write-line "*scan=3" f)
+              (write-line (strcat "*current=" (getvar "CLAYER")) f)
+              (setq lay (tblnext "LTYPE" T))
+              (while lay
+                (write-line (strcat "*linetype=" (cdr (assoc 2 lay))) f)
+                (setq lay (tblnext "LTYPE")))
+              (setq lay (tblnext "LAYER" T))
+              (while lay
+                (setq name (cdr (assoc 2 lay)) flags (cdr (assoc 70 lay)))
+                (write-line name f)
+                (if (= 1 (logand 1 flags)) (write-line (strcat "*frozen=" name) f))
+                (if (= 4 (logand 4 flags)) (write-line (strcat "*locked=" name) f))
+                (if (minusp (cdr (assoc 62 lay))) (write-line (strcat "*off=" name) f))
+                (if (equal (cdr (assoc 290 (entget (tblobjname "LAYER" name)))) 0)
+                  (write-line (strcat "*noplot=" name) f))
+                (setq lay (tblnext "LAYER")))
+              (close f)))
+          (princ))
+        """;
+
     public static string BuildLisp(Plan plan)
     {
         var lisp = new StringBuilder();
+        lisp.AppendLine(RescanLisp);
         lisp.AppendLine("(defun c:CSB_RUN ()");
 
         foreach (var op in plan.Operations)
@@ -156,6 +187,7 @@ public static class Engine
         {
             lisp.AppendLine($"      {plan.Operations[i].SummaryLisp(plan.Operations.Skip(i + 1))}");
         }
+        lisp.AppendLine("""      (csb-rescan)""");
         lisp.AppendLine("""      (princ "\nType U once to undo all of it."))""");
         lisp.AppendLine("""    (princ "\nCancelled. Nothing changed."))""");
         lisp.AppendLine("""  (princ))""");

@@ -50,7 +50,14 @@
                                VerticalAlignment="Center"
                                FontSize="13"
                                Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
-                    <ui:Button Margin="8,0,0,0"
+                    <ui:Button x:Name="RefreshButton"
+                               Margin="8,0,0,0"
+                               Padding="8,4"
+                               Appearance="Transparent"
+                               Click="RefreshButton_Click"
+                               Icon="{ui:SymbolIcon ArrowClockwise24}"
+                               ToolTip="Refresh: rescan this drawing after changing it by hand" />
+                    <ui:Button Margin="0,0,0,0"
                                Padding="8,4"
                                Appearance="Transparent"
                                Click="ChangeDrawing_Click"
@@ -239,6 +246,54 @@
                 </StackPanel>
             </Border>
         </Grid>
+        <!-- Refresh: a mini SCAN tile to drag into the drawing -->
+        <Popup x:Name="RefreshPopup"
+               AllowsTransparency="True"
+               Placement="Bottom"
+               PlacementTarget="{Binding ElementName=RefreshButton}"
+               StaysOpen="False">
+            <Border Width="260"
+                    Margin="0,6,0,0"
+                    Padding="16"
+                    Background="{DynamicResource FlyoutBackground}"
+                    BorderBrush="{DynamicResource FlyoutBorderBrush}"
+                    BorderThickness="1"
+                    CornerRadius="8">
+                <StackPanel>
+                    <Border x:Name="RefreshTile"
+                            Width="96"
+                            Height="96"
+                            HorizontalAlignment="Center"
+                            Background="{DynamicResource CardBackgroundFillColorDefaultBrush}"
+                            BorderBrush="{DynamicResource AccentFillColorDefaultBrush}"
+                            BorderThickness="2"
+                            CornerRadius="10"
+                            Cursor="Hand"
+                            MouseMove="RefreshTile_MouseMove"
+                            ToolTip="Drag me into your drawing">
+                        <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                            <ui:SymbolIcon HorizontalAlignment="Center"
+                                           FontSize="32"
+                                           Foreground="{DynamicResource AccentFillColorDefaultBrush}"
+                                           Symbol="Document24" />
+                            <TextBlock Margin="0,4,0,0"
+                                       HorizontalAlignment="Center"
+                                       FontSize="13"
+                                       FontWeight="SemiBold"
+                                       Foreground="{DynamicResource TextFillColorPrimaryBrush}"
+                                       Text="SCAN" />
+                        </StackPanel>
+                    </Border>
+                    <TextBlock Margin="0,12,0,0"
+                               FontSize="13"
+                               Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                               Text="Drag this into your drawing to refresh. Your steps are kept."
+                               TextAlignment="Center"
+                               TextWrapping="Wrap" />
+                </StackPanel>
+            </Border>
+        </Popup>
+
         <!-- The multi-select picker: tick layers, they're numbered in the order you tick them -->
         <Popup x:Name="PickerPopup"
                AllowsTransparency="True"

@@ -3,6 +3,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Threading;
 using Core;
 using InfoBarSeverity = Wpf.Ui.Controls.InfoBarSeverity;
 using SymbolRegular = Wpf.Ui.Controls.SymbolRegular;
@@ -112,6 +113,18 @@ public partial class StepsPage : UserControl
         Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
         "CADScriptBuilder", "Plans");
 
+    // Where scans land (written by the SCAN tile, and by every script after it runs)
+    private static readonly string LayersFile = Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
+        "CADScriptBuilder", "layers.txt");
+
+    // The scan script, next to the .exe (copied there by Gui.csproj)
+    private static readonly string ScanScript = Path.Combine(AppContext.BaseDirectory, "csb_scan.lsp");
+
+    // Watches for new scans while this page is showing, so it re-syncs by itself
+    private FileSystemWatcher? refreshWatcher;
+    private readonly DispatcherTimer refreshTimer = new() { Interval = TimeSpan.FromMilliseconds(500) };
+
     // Where the generated script is saved (overwritten each time)
     private readonly string runScript = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
@@ -134,6 +147,12 @@ public partial class StepsPage : UserControl
 
         UpdateBoxes();
         RefreshSteps();
+
+        refreshTimer.Tick += (sender, e) => RefreshFromScan();
+
+        // Only watch for new scans while this page is on screen
+        Loaded += (sender, e) => StartWatching();
+        Unloaded += (sender, e) => StopWatching();
 
         // Switching to another window (e.g. Civil 3D) closes any open dropdown too
         Loaded += (sender, e) =>
@@ -166,6 +185,93 @@ public partial class StepsPage : UserControl
     private void ChangeDrawing_Click(object sender, RoutedEventArgs e)
     {
         ChangeDrawingClicked?.Invoke();
+    }
+
+    // ---- Refresh: re-sync with the drawing after it changes ----
+
+    private void RefreshButton_Click(object sender, RoutedEventArgs e)
+    {
+        RefreshPopup.IsOpen = !RefreshPopup.IsOpen;
+    }
+
+    // The mini SCAN tile: drag it into the drawing, like on the first page
+    private void RefreshTile_MouseMove(object sender, MouseEventArgs e)
+    {
+        if (e.LeftButton != MouseButtonState.Pressed || !File.Exists(ScanScript))
+        {
+            return;
+        }
+
+        var data = new DataObject(DataFormats.FileDrop, new[] { ScanScript });
+        DragDrop.DoDragDrop(RefreshTile, data, DragDropEffects.Copy);
+    }
+
+    private void StartWatching()
+    {
+        if (refreshWatcher is not null)
+        {
+            return;
+        }
+
+        var folder = Path.GetDirectoryName(LayersFile)!;
+        Directory.CreateDirectory(folder);
+        refreshWatcher = new FileSystemWatcher(folder, "layers.txt");
+        refreshWatcher.Created += (sender, e) => Dispatcher.Invoke(() => RestartRefreshTimer());
+        refreshWatcher.Changed += (sender, e) => Dispatcher.Invoke(() => RestartRefreshTimer());
+        refreshWatcher.EnableRaisingEvents = true;
+    }
+
+    private void StopWatching()
+    {
+        refreshTimer.Stop();
+        if (refreshWatcher is not null)
+        {
+            refreshWatcher.EnableRaisingEvents = false;
+            refreshWatcher.Dispose();
+            refreshWatcher = null;
+        }
+    }
+
+    // Wait half a second for Civil 3D to finish writing, then read the new scan
+    private void RestartRefreshTimer()
+    {
+        refreshTimer.Stop();
+        refreshTimer.Start();
+    }
+
+    private void RefreshFromScan()
+    {
+        refreshTimer.Stop();
+
+        Scan fresh;
+        try
+        {
+            fresh = Engine.ReadScan(LayersFile);
+        }
+        catch (IOException)
+        {
+            refreshTimer.Start();   // still being written, try again shortly
+            return;
+        }
+        catch (InvalidDataException)
+        {
+            return;
+        }
+
+        RefreshPopup.IsOpen = false;
+        UseScan(fresh);
+
+        if (plan.Operations.Count == 0 || Status.Severity == InfoBarSeverity.Success)
+        {
+            SetStatus(InfoBarSeverity.Informational, "Drawing refreshed",
+                $"Re-synced with {scan.Drawing}." + (plan.Operations.Count > 0 ? " All steps still check out." : ""));
+        }
+        else
+        {
+            SetStatus(InfoBarSeverity.Warning, "Drawing refreshed",
+                "Your steps were re-checked against the updated drawing. If your script just ran, " +
+                "the steps that already happened now show ✖. Press Clear all to start the next one.");
+        }
     }
 
     private BlockChoice SelectedBlock => Blocks[BlockBox.SelectedIndex];

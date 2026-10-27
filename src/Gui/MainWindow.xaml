@@ -20,27 +20,64 @@
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
-          <ui:TitleBar Grid.Row="0" Title="CADScriptBuilder">
+        <ui:TitleBar Grid.Row="0" Title="CADScriptBuilder">
             <ui:TitleBar.Icon>
                 <ui:ImageIcon Source="pack://application:,,,/csb.png" />
             </ui:TitleBar.Icon>
             <ui:TitleBar.TrailingContent>
-                <ui:Button x:Name="PinButton"
-                           Width="44"
-                           Height="30"
-                           Padding="0"
-                           VerticalAlignment="Top"
-                           HorizontalContentAlignment="Center"
-                           Appearance="Transparent"
-                           BorderThickness="0"
-                           CornerRadius="0"
-                           Click="PinButton_Click"
-                           ToolTip="Unpin: stop keeping this window on top">
-                    <ui:SymbolIcon x:Name="PinIcon" Symbol="Pin24" Filled="True" FontSize="14" />
-                </ui:Button>
+                <StackPanel VerticalAlignment="Top" Orientation="Horizontal">
+                    <!-- ? opens the instructions -->
+                    <ui:Button x:Name="HelpButton"
+                               Width="44"
+                               Height="30"
+                               Padding="0"
+                               VerticalAlignment="Top"
+                               HorizontalContentAlignment="Center"
+                               Appearance="Transparent"
+                               BorderThickness="0"
+                               CornerRadius="0"
+                               Click="HelpButton_Click"
+                               ToolTip="How to use CADScriptBuilder">
+                        <ui:SymbolIcon Symbol="QuestionCircle24" FontSize="14" />
+                    </ui:Button>
+                    <!-- The pin keeps the window on top of Civil 3D -->
+                    <ui:Button x:Name="PinButton"
+                               Width="44"
+                               Height="30"
+                               Padding="0"
+                               VerticalAlignment="Top"
+                               HorizontalContentAlignment="Center"
+                               Appearance="Transparent"
+                               BorderThickness="0"
+                               CornerRadius="0"
+                               Click="PinButton_Click"
+                               ToolTip="Unpin: stop keeping this window on top">
+                        <ui:SymbolIcon x:Name="PinIcon" Symbol="Pin24" Filled="True" FontSize="14" />
+                    </ui:Button>
+                </StackPanel>
             </ui:TitleBar.TrailingContent>
         </ui:TitleBar>
 
         <ContentControl x:Name="PageHost" Grid.Row="1" />
+
+        <!-- The instructions, dropping down under the ? button -->
+        <Popup x:Name="HelpPopup"
+               AllowsTransparency="True"
+               HorizontalOffset="-356"
+               Placement="Bottom"
+               PlacementTarget="{Binding ElementName=HelpButton}"
+               StaysOpen="False">
+            <Border Width="400"
+                    Margin="0,4,0,0"
+                    Padding="18,14"
+                    Background="{DynamicResource FlyoutBackground}"
+                    BorderBrush="{DynamicResource FlyoutBorderBrush}"
+                    BorderThickness="1"
+                    CornerRadius="8">
+                <ScrollViewer MaxHeight="460" VerticalScrollBarVisibility="Auto">
+                    <StackPanel x:Name="HelpPanel" Margin="0,0,10,0" />
+                </ScrollViewer>
+            </Border>
+        </Popup>
     </Grid>
 </ui:FluentWindow>
