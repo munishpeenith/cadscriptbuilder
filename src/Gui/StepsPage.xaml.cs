@@ -49,7 +49,7 @@ public partial class StepsPage : UserControl
 
     private void AddButton_Click(object sender, RoutedEventArgs e)
     {
-        var first = FirstBox.Text.Trim();
+        var first = (FirstBox.Text ?? "").Trim();
         var second = SecondBox.Text.Trim();
 
         if (BlockBox.SelectedIndex == 0)
@@ -71,7 +71,7 @@ public partial class StepsPage : UserControl
             plan.Operations.Add(new PurgeLayer { Layer = first });
         }
 
-        FirstBox.Clear();
+        FirstBox.Text = "";
         SecondBox.Clear();
         FirstBox.Focus();
         RefreshSteps();
@@ -119,6 +119,12 @@ public partial class StepsPage : UserControl
         }
 
         StepsList.ItemsSource = rows;
+
+                // Suggest the layers as they'll be after the steps so far, A to Z
+        FirstBox.OriginalItemsSource = layers
+            .OrderBy(name => name, StringComparer.OrdinalIgnoreCase)
+            .Cast<object>()
+            .ToList();
 
         if (plan.Operations.Count == 0)
         {

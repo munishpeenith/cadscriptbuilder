@@ -38,7 +38,7 @@
                     <ComboBoxItem Content="Purge layer" />
                 </ComboBox>
 
-                <ui:TextBox x:Name="FirstBox" Grid.Column="1" Margin="8,0,0,0" />
+                <ui:AutoSuggestBox x:Name="FirstBox" Grid.Column="1" Margin="8,0,0,0" />
                 <ui:TextBox x:Name="SecondBox" Grid.Column="2" Margin="8,0,0,0" PlaceholderText="To layer" />
 
                 <ui:Button x:Name="AddButton"
