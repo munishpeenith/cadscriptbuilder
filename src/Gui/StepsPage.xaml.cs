@@ -26,6 +26,9 @@ public record BlockChoice(
 // Page 2: build the steps, see a live tick on each one, generate the script as a draggable tile.
 public partial class StepsPage : UserControl
 {
+    // Tells the window "go back to the scan page" (the steps are kept)
+    public event Action? ChangeDrawingClicked;
+
     // Every block the user can pick, in dropdown order
     private static readonly BlockChoice[] Blocks =
     [
@@ -66,7 +69,7 @@ public partial class StepsPage : UserControl
     ];
 
     // The drawing we synced with on page 1, and the plan being built
-    private readonly Scan scan;
+    private Scan scan;
     private readonly Plan plan = new();
 
     // The pretend drawing after all the steps so far (feeds the suggestions)
@@ -83,7 +86,7 @@ public partial class StepsPage : UserControl
         this.scan = scan;
         after = new DrawingState(scan);
 
-        DrawingText.Text = $"{scan.Drawing}  ·  {scan.Layers.Count} layers";
+        ShowDrawing();
 
         BlockBox.ItemsSource = Blocks.Select(block => block.Name).ToList();
         BlockBox.SelectedIndex = 0;
@@ -91,6 +94,25 @@ public partial class StepsPage : UserControl
 
         UpdateBoxes();
         RefreshSteps();
+    }
+
+    // Back from the scan page with a new (or fresh) scan: keep the steps, re-check them
+    public void UseScan(Scan newScan)
+    {
+        scan = newScan;
+        ShowDrawing();
+        RefreshSteps();
+    }
+
+    private void ShowDrawing()
+    {
+        ConnectedText.Text = $"Connected: {scan.Drawing}";
+        DrawingText.Text = $"{scan.Layers.Count} layers in this drawing";
+    }
+
+    private void ChangeDrawing_Click(object sender, RoutedEventArgs e)
+    {
+        ChangeDrawingClicked?.Invoke();
     }
 
     private BlockChoice SelectedBlock => Blocks[BlockBox.SelectedIndex];
@@ -180,6 +202,19 @@ public partial class StepsPage : UserControl
 
         plan.Operations.RemoveAt(i);
         RefreshSteps();
+    }
+
+    // Start again: remove every step (and the old script with them)
+    private void ClearButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (plan.Operations.Count == 0)
+        {
+            return;
+        }
+
+        plan.Operations.Clear();
+        RefreshSteps();
+        SetStatus(InfoBarSeverity.Informational, "Cleared", "All steps removed. Ready for a new script.");
     }
 
     // Redraw the list, checking every step against the drawing as we go.

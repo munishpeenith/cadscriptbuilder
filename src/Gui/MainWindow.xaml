@@ -6,7 +6,10 @@
                  Icon="pack://application:,,,/csb.ico"
                  Width="660"
                  Height="640"
-                 ResizeMode="NoResize"
+                 ResizeMode="CanResize"
+                 MinWidth="600"
+                 MinHeight="600"
+                 Topmost="True"
                  WindowStartupLocation="CenterScreen"
                  ExtendsContentIntoTitleBar="True"
                  WindowBackdropType="Mica"
@@ -17,10 +20,25 @@
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
-        <ui:TitleBar Grid.Row="0" Title="CADScriptBuilder" ShowMaximize="False">
+          <ui:TitleBar Grid.Row="0" Title="CADScriptBuilder">
             <ui:TitleBar.Icon>
                 <ui:ImageIcon Source="pack://application:,,,/csb.png" />
             </ui:TitleBar.Icon>
+            <ui:TitleBar.TrailingContent>
+                <ui:Button x:Name="PinButton"
+                           Width="44"
+                           Height="30"
+                           Padding="0"
+                           VerticalAlignment="Top"
+                           HorizontalContentAlignment="Center"
+                           Appearance="Transparent"
+                           BorderThickness="0"
+                           CornerRadius="0"
+                           Click="PinButton_Click"
+                           ToolTip="Unpin: stop keeping this window on top">
+                    <ui:SymbolIcon x:Name="PinIcon" Symbol="Pin24" Filled="True" FontSize="14" />
+                </ui:Button>
+            </ui:TitleBar.TrailingContent>
         </ui:TitleBar>
 
         <ContentControl x:Name="PageHost" Grid.Row="1" />

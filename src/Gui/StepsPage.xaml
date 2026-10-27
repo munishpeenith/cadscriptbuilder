@@ -11,17 +11,52 @@
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
-        <!-- Header -->
-        <StackPanel Grid.Row="0" Margin="0,0,0,16">
-            <TextBlock FontSize="24"
-                       FontWeight="SemiBold"
-                       Foreground="{DynamicResource TextFillColorPrimaryBrush}"
-                       Text="Build your steps" />
-            <TextBlock x:Name="DrawingText"
-                       Margin="0,4,0,0"
-                       FontSize="13"
-                       Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
-        </StackPanel>
+        <!-- Header: title on the left, the connected drawing on the right -->
+        <Grid Grid.Row="0" Margin="0,0,0,16">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+
+            <StackPanel Grid.Column="0">
+                <TextBlock FontSize="24"
+                           FontWeight="SemiBold"
+                           Foreground="{DynamicResource TextFillColorPrimaryBrush}"
+                           Text="Build your steps" />
+                <TextBlock x:Name="DrawingText"
+                           Margin="0,4,0,0"
+                           FontSize="13"
+                           Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+            </StackPanel>
+
+            <Border Grid.Column="1"
+                    Margin="0,20,0,0"
+                    Padding="12,4,4,4"
+                    VerticalAlignment="Top"
+                    Background="{DynamicResource CardBackgroundFillColorDefaultBrush}"
+                    BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}"
+                    BorderThickness="1"
+                    CornerRadius="16">
+                <StackPanel Orientation="Horizontal">
+                    <Ellipse Width="8"
+                             Height="8"
+                             Margin="0,0,8,0"
+                             VerticalAlignment="Center"
+                             Fill="#6CCB5F" />
+                    <TextBlock x:Name="ConnectedText"
+                               VerticalAlignment="Center"
+                               FontSize="13"
+                               Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
+                    <ui:Button Margin="8,0,0,0"
+                               Padding="8,4"
+                               Appearance="Transparent"
+                               Click="ChangeDrawing_Click"
+                               Content="Change"
+                               Icon="{ui:SymbolIcon ArrowSync24}"
+                               ToolTip="Rescan, or switch to another drawing. Your steps are kept." />
+                </StackPanel>
+            </Border>
+        </Grid>
 
         <!-- Pick a block, fill in its boxes, Add -->
         <ui:Card Grid.Row="1" Padding="16">
@@ -62,12 +97,19 @@
             </Grid.RowDefinitions>
 
             <DockPanel Grid.Row="0" Margin="0,0,0,8">
-                <ui:Button x:Name="RemoveButton"
-                           DockPanel.Dock="Right"
-                           Appearance="Secondary"
-                           Click="RemoveButton_Click"
-                           Content="Remove"
-                           Icon="{ui:SymbolIcon Delete24}" />
+                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                    <ui:Button x:Name="ClearButton"
+                               Margin="0,0,8,0"
+                               Appearance="Secondary"
+                               Click="ClearButton_Click"
+                               Content="Clear all"
+                               Icon="{ui:SymbolIcon Dismiss24}" />
+                    <ui:Button x:Name="RemoveButton"
+                               Appearance="Secondary"
+                               Click="RemoveButton_Click"
+                               Content="Remove"
+                               Icon="{ui:SymbolIcon Delete24}" />
+                </StackPanel>
                 <TextBlock VerticalAlignment="Center"
                            FontSize="16"
                            FontWeight="SemiBold"

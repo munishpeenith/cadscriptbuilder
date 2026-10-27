@@ -15,6 +15,9 @@ public partial class ScanPage : UserControl
     // Tells the window "Next was clicked, and here's the scan"
     public event Action<Scan>? NextClicked;
 
+    // Tells the window "go back to the steps without rescanning"
+    public event Action? BackClicked;
+
     // The scan script, copied next to the .exe by Gui.csproj
     private readonly string scanScript = Path.Combine(AppContext.BaseDirectory, "csb_scan.lsp");
 
@@ -27,9 +30,10 @@ public partial class ScanPage : UserControl
     private readonly DispatcherTimer settleTimer = new() { Interval = TimeSpan.FromMilliseconds(500) };
     private Scan? scan;
 
-    public ScanPage()
+    public ScanPage(bool canGoBack = false)
     {
         InitializeComponent();
+        BackButton.Visibility = canGoBack ? Visibility.Visible : Visibility.Collapsed;
 
         // Watch the folder for layers.txt being written
         var folder = Path.GetDirectoryName(layersFile)!;
@@ -105,12 +109,22 @@ public partial class ScanPage : UserControl
             return;
         }
 
-        // Stop watching: this page's job is done
+        StopWatching();
+        NextClicked?.Invoke(scan);
+    }
+
+    private void BackButton_Click(object sender, RoutedEventArgs e)
+    {
+        StopWatching();
+        BackClicked?.Invoke();
+    }
+
+    // This page's job is done: stop watching for layers.txt
+    private void StopWatching()
+    {
         watcher.EnableRaisingEvents = false;
         watcher.Dispose();
         settleTimer.Stop();
-
-        NextClicked?.Invoke(scan);
     }
 
     private void ShowError(string message)
