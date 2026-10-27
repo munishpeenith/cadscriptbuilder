@@ -1,6 +1,6 @@
 using System.Text.Json.Serialization;
 
-namespace Generator;
+namespace Core;
 
 [JsonPolymorphic(TypeDiscriminatorPropertyName = "type")]
 [JsonDerivedType(typeof(RenameLayer), "renameLayer")]
