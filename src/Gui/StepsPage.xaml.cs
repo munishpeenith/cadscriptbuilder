@@ -17,11 +17,13 @@ public enum Suggest { Nothing, Layers, Linetypes, Lineweights }
 
 // One choice in the block dropdown: its name, the hints and suggestions for its boxes,
 // and how to build the block from what's typed. SecondHint is null for one-box blocks.
+// Show (optional) narrows the layer suggestions to the ones that make sense for this block.
 public record BlockChoice(
     string Name,
     string FirstHint, Suggest FirstSuggest,
     string? SecondHint, Suggest SecondSuggest,
-    Func<string, string, Operation> Make);
+    Func<string, string, Operation> Make,
+    Func<DrawingState, string, bool>? Show = null);
 
 // Page 2: build the steps, see a live tick on each one, generate the script as a draggable tile.
 public partial class StepsPage : UserControl
@@ -33,25 +35,34 @@ public partial class StepsPage : UserControl
     private static readonly BlockChoice[] Blocks =
     [
         new("Rename layer", "From layer", Suggest.Layers, "To layer", Suggest.Nothing,
-            (a, b) => new RenameLayer { From = a, To = b }),
+            (a, b) => new RenameLayer { From = a, To = b },
+            Show: (d, l) => !LayerRules.IsProtected(l)),
         new("New layer", "New layer name", Suggest.Nothing, null, Suggest.Nothing,
             (a, _) => new NewLayer { Layer = a }),
         new("Purge layer", "Layer to purge", Suggest.Layers, null, Suggest.Nothing,
-            (a, _) => new PurgeLayer { Layer = a }),
+            (a, _) => new PurgeLayer { Layer = a },
+            Show: (d, l) => !LayerRules.IsProtected(l) && !d.IsCurrent(l)),
         new("Set current", "Layer", Suggest.Layers, null, Suggest.Nothing,
-            (a, _) => new SetCurrentLayer { Layer = a }),
+            (a, _) => new SetCurrentLayer { Layer = a },
+            Show: (d, l) => !d.Frozen.Contains(l) && !d.IsCurrent(l)),
         new("Freeze", "Layer", Suggest.Layers, null, Suggest.Nothing,
-            (a, _) => new FreezeLayer { Layer = a }),
+            (a, _) => new FreezeLayer { Layer = a },
+            Show: (d, l) => !d.IsCurrent(l) && (!d.KnowsFrozen || !d.Frozen.Contains(l))),
         new("Thaw", "Layer", Suggest.Layers, null, Suggest.Nothing,
-            (a, _) => new ThawLayer { Layer = a }),
+            (a, _) => new ThawLayer { Layer = a },
+            Show: (d, l) => !d.KnowsFrozen || d.Frozen.Contains(l)),
         new("Turn off", "Layer", Suggest.Layers, null, Suggest.Nothing,
-            (a, _) => new TurnOffLayer { Layer = a }),
+            (a, _) => new TurnOffLayer { Layer = a },
+            Show: (d, l) => !d.IsCurrent(l) && (!d.KnowsOnOffLockPlot || !d.Off.Contains(l))),
         new("Turn on", "Layer", Suggest.Layers, null, Suggest.Nothing,
-            (a, _) => new TurnOnLayer { Layer = a }),
+            (a, _) => new TurnOnLayer { Layer = a },
+            Show: (d, l) => !d.KnowsOnOffLockPlot || d.Off.Contains(l)),
         new("Lock", "Layer", Suggest.Layers, null, Suggest.Nothing,
-            (a, _) => new LockLayer { Layer = a }),
+            (a, _) => new LockLayer { Layer = a },
+            Show: (d, l) => !d.KnowsOnOffLockPlot || !d.Locked.Contains(l)),
         new("Unlock", "Layer", Suggest.Layers, null, Suggest.Nothing,
-            (a, _) => new UnlockLayer { Layer = a }),
+            (a, _) => new UnlockLayer { Layer = a },
+            Show: (d, l) => !d.KnowsOnOffLockPlot || d.Locked.Contains(l)),
         new("Set colour", "Layer", Suggest.Layers, "Colour 1-255", Suggest.Nothing,
             (a, b) => new SetLayerColour { Layer = a, Colour = b }),
         new("Set linetype", "Layer", Suggest.Layers, "Linetype", Suggest.Linetypes,
@@ -63,9 +74,11 @@ public partial class StepsPage : UserControl
         new("Set description", "Layer", Suggest.Layers, "Description", Suggest.Nothing,
             (a, b) => new SetLayerDescription { Layer = a, Description = b }),
         new("Plot on", "Layer", Suggest.Layers, null, Suggest.Nothing,
-            (a, _) => new PlotLayer { Layer = a }),
+            (a, _) => new PlotLayer { Layer = a },
+            Show: (d, l) => !d.KnowsOnOffLockPlot || d.NoPlot.Contains(l)),
         new("Plot off", "Layer", Suggest.Layers, null, Suggest.Nothing,
-            (a, _) => new NoPlotLayer { Layer = a }),
+            (a, _) => new NoPlotLayer { Layer = a },
+            Show: (d, l) => !d.KnowsOnOffLockPlot || !d.NoPlot.Contains(l)),
     ];
 
     // The drawing we synced with on page 1, and the plan being built
@@ -74,6 +87,9 @@ public partial class StepsPage : UserControl
 
     // The pretend drawing after all the steps so far (feeds the suggestions)
     private DrawingState after;
+
+    // A step that failed its check, waiting in case the user clicks "Add anyway"
+    private Operation? pendingStep;
 
     // Where the generated script is saved (overwritten each time)
     private readonly string runScript = Path.Combine(
@@ -91,6 +107,8 @@ public partial class StepsPage : UserControl
         BlockBox.ItemsSource = Blocks.Select(block => block.Name).ToList();
         BlockBox.SelectedIndex = 0;
         BlockBox.SelectionChanged += (sender, e) => UpdateBoxes();
+        FirstBox.TextChanged += (sender, e) => CancelPending();
+        SecondBox.TextChanged += (sender, e) => CancelPending();
 
         UpdateBoxes();
         RefreshSteps();
@@ -120,6 +138,7 @@ public partial class StepsPage : UserControl
     // Show one or two boxes, with the right hints, for the chosen block
     private void UpdateBoxes()
     {
+        CancelPending();
         var block = SelectedBlock;
         bool twoBoxes = block.SecondHint is not null;
 
@@ -134,15 +153,17 @@ public partial class StepsPage : UserControl
     // Fill each box's suggestions from the drawing as it'll be after the steps so far
     private void UpdateSuggestions()
     {
-        FirstBox.OriginalItemsSource = SuggestionsFor(SelectedBlock.FirstSuggest);
-        SecondBox.OriginalItemsSource = SuggestionsFor(SelectedBlock.SecondSuggest);
+        FirstBox.OriginalItemsSource = SuggestionsFor(SelectedBlock.FirstSuggest, SelectedBlock.Show);
+        SecondBox.OriginalItemsSource = SuggestionsFor(SelectedBlock.SecondSuggest, null);
     }
 
-    private List<object> SuggestionsFor(Suggest kind)
+    private List<object> SuggestionsFor(Suggest kind, Func<DrawingState, string, bool>? show)
     {
         IEnumerable<string> items = kind switch
         {
-            Suggest.Layers => after.Layers.OrderBy(name => name, StringComparer.OrdinalIgnoreCase),
+            Suggest.Layers => after.Layers
+                .Where(name => show is null || show(after, name))
+                .OrderBy(name => name, StringComparer.OrdinalIgnoreCase),
             Suggest.Linetypes => after.Linetypes.OrderBy(name => name, StringComparer.OrdinalIgnoreCase),
             Suggest.Lineweights => SetLayerLineweight.Allowed,
             _ => [],
@@ -183,12 +204,45 @@ public partial class StepsPage : UserControl
             return;
         }
 
-        plan.Operations.Add(block.Make(first, second));
+        var step = block.Make(first, second);
+
+        // Try the step on a copy of the drawing (as it'll be after the steps so far) before adding it
+        var trial = step.Check(new DrawingState(after));
+        if (trial.HasProblems)
+        {
+            pendingStep = step;
+            AddAnywayButton.Visibility = Visibility.Visible;
+            SetStatus(InfoBarSeverity.Error, "Not added", string.Join(Environment.NewLine, trial.Problems));
+            return;
+        }
+
+        AddStep(step);
+    }
+
+    // Add it even though it can't work yet (e.g. it's meant for a different drawing)
+    private void AddAnyway_Click(object sender, RoutedEventArgs e)
+    {
+        if (pendingStep is not null)
+        {
+            AddStep(pendingStep);
+        }
+    }
+
+    private void AddStep(Operation step)
+    {
+        plan.Operations.Add(step);
 
         FirstBox.Text = "";
         SecondBox.Text = "";
         FirstBox.Focus();
         RefreshSteps();
+    }
+
+    // The step waiting for "Add anyway" is forgotten as soon as anything changes
+    private void CancelPending()
+    {
+        pendingStep = null;
+        AddAnywayButton.Visibility = Visibility.Collapsed;
     }
 
     private void RemoveButton_Click(object sender, RoutedEventArgs e)
@@ -228,21 +282,39 @@ public partial class StepsPage : UserControl
             File.Delete(runScript);
         }
 
+        CancelPending();
+
         // A pretend copy of the drawing that the steps change as they're checked
         var drawing = new DrawingState(scan);
         var rows = new List<StepRow>();
-        var allProblems = new List<string>();
+        var problems = new List<string>();
+        var notes = new List<string>();
 
         var good = GetBrush("SystemFillColorSuccessBrush", Color.FromRgb(0x6C, 0xCB, 0x5F));
+        var careful = GetBrush("SystemFillColorCautionBrush", Color.FromRgb(0xFC, 0xE1, 0x00));
         var bad = GetBrush("SystemFillColorCriticalBrush", Color.FromRgb(0xFF, 0x99, 0xA4));
 
+        int number = 0;
         foreach (var op in plan.Operations)
         {
-            var problems = op.Check(drawing);
-            rows.Add(problems.Count == 0
-                ? new StepRow(SymbolRegular.CheckmarkCircle24, op.Describe(), good)
-                : new StepRow(SymbolRegular.DismissCircle24, op.Describe(), bad));
-            allProblems.AddRange(problems);
+            number++;
+            var result = op.Check(drawing);
+
+            if (result.HasProblems)
+            {
+                rows.Add(new StepRow(SymbolRegular.DismissCircle24, op.Describe(), bad));
+            }
+            else if (result.HasNotes)
+            {
+                rows.Add(new StepRow(SymbolRegular.Warning24, op.Describe(), careful));
+            }
+            else
+            {
+                rows.Add(new StepRow(SymbolRegular.CheckmarkCircle24, op.Describe(), good));
+            }
+
+            problems.AddRange(result.Problems.Select(p => $"Step {number}: {p}"));
+            notes.AddRange(result.Notes.Select(n => $"Step {number}: {n}"));
         }
 
         StepsList.ItemsSource = rows;
@@ -250,15 +322,23 @@ public partial class StepsPage : UserControl
         after = drawing;
         UpdateSuggestions();
 
+        var nl = Environment.NewLine;
         if (plan.Operations.Count == 0)
         {
             SetStatus(InfoBarSeverity.Informational, "No steps yet", "Pick a block above and press Add.");
             GenerateButton.IsEnabled = false;
         }
-        else if (allProblems.Count > 0)
+        else if (problems.Count > 0)
         {
-            SetStatus(InfoBarSeverity.Error, "Doesn't match the drawing", string.Join(Environment.NewLine, allProblems));
+            // Problems first, then any notes underneath
+            SetStatus(InfoBarSeverity.Error, "Doesn't match the drawing", string.Join(nl, problems.Concat(notes)));
             GenerateButton.IsEnabled = false;
+        }
+        else if (notes.Count > 0)
+        {
+            var title = notes.Count == 1 ? "1 thing to check" : $"{notes.Count} things to check";
+            SetStatus(InfoBarSeverity.Warning, title, string.Join(nl, notes));
+            GenerateButton.IsEnabled = true;
         }
         else
         {
@@ -270,7 +350,7 @@ public partial class StepsPage : UserControl
     private void GenerateButton_Click(object sender, RoutedEventArgs e)
     {
         // Final check with the same Engine the command line uses
-        if (Engine.Check(plan, scan).Count > 0)
+        if (Engine.Check(plan, scan).HasProblems)
         {
             RefreshSteps();
             return;

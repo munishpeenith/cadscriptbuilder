@@ -10,44 +10,50 @@ public class NewLayer : Operation
 
     public override string ToLisp() => $"""(command "_.-LAYER" "_New" {Lisp.Quote(Layer)} "")""";
 
-    public override List<string> Check(DrawingState drawing)
+    public override CheckResult Check(DrawingState drawing)
     {
-        var problems = new List<string>();
+        var result = new CheckResult();
         var nameProblem = LayerRules.NameProblem(Layer);
 
         if (nameProblem is not null)
         {
-            problems.Add($"Can't create layer: {nameProblem}");
+            result.Problem($"Can't create layer: {nameProblem}");
         }
         else if (drawing.HasLayer(Layer))
         {
-            problems.Add($"Can't create {Layer}: it already exists");
+            result.Problem($"Can't create {Layer}: it already exists");
         }
         else
         {
             drawing.Layers.Add(Layer);
         }
 
-        return problems;
+        return result;
     }
 }
 
 public class SetCurrentLayer : LayerSetting
 {
-    protected override string Verb => "make current";
+    protected override string Verb => "switch to";
     protected override string[] Options => ["_Set"];
 
     public override string Describe() => $"Would make {Layer} the current layer";
 
-    protected override void CheckMore(DrawingState drawing, List<string> problems)
+    protected override void CheckMore(DrawingState drawing, CheckResult result)
     {
         if (drawing.Frozen.Contains(Layer))
         {
-            problems.Add($"Can't make {Layer} current: it's frozen");
+            result.Problem($"Can't make {Layer} current: it's frozen");
+            return;
         }
-        else
+        if (drawing.IsCurrent(Layer))
         {
-            drawing.Current = Layer;
+            result.Note($"{Layer} is already the current layer, so this step changes nothing");
         }
+        else if (drawing.KnowsOnOffLockPlot && drawing.Off.Contains(Layer))
+        {
+            result.Note($"{Layer} is off, so anything drawn on it won't be visible");
+        }
+        drawing.Current = Layer;
     }
 }

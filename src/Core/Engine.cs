@@ -55,14 +55,23 @@ public static class Engine
         var layers = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var frozen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var linetypes = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var off = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var locked = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var noPlot = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         string? current = null;
+        int version = 1;
 
         // Lines starting with * are extra info (layer names can't contain *)
         foreach (var line in lines.Skip(1))
         {
-            if (line.StartsWith("*current="))
+            if (line.StartsWith("*scan="))
+            {
+                int.TryParse(line["*scan=".Length..], out version);
+            }
+            else if (line.StartsWith("*current="))
             {
                 current = line["*current=".Length..];
+                version = Math.Max(version, 2);
             }
             else if (line.StartsWith("*frozen="))
             {
@@ -72,26 +81,38 @@ public static class Engine
             {
                 linetypes.Add(line["*linetype=".Length..]);
             }
+            else if (line.StartsWith("*off="))
+            {
+                off.Add(line["*off=".Length..]);
+            }
+            else if (line.StartsWith("*locked="))
+            {
+                locked.Add(line["*locked=".Length..]);
+            }
+            else if (line.StartsWith("*noplot="))
+            {
+                noPlot.Add(line["*noplot=".Length..]);
+            }
             else if (line != "")
             {
                 layers.Add(line);
             }
         }
 
-        return new Scan(lines[0], layers, current, frozen, linetypes);
+        return new Scan(lines[0], layers, current, frozen, linetypes, off, locked, noPlot, version);
     }
 
-    public static List<string> Check(Plan plan, Scan scan)
+    public static CheckResult Check(Plan plan, Scan scan)
     {
         // Work on a pretend copy, so checking never changes the scan itself
         var drawing = new DrawingState(scan);
 
-        var problems = new List<string>();
+        var result = new CheckResult();
         foreach (var op in plan.Operations)
         {
-            problems.AddRange(op.Check(drawing));
+            result.Add(op.Check(drawing));
         }
-        return problems;
+        return result;
     }
 
     public static string BuildLisp(Plan plan)

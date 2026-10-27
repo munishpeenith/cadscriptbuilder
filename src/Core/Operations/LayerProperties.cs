@@ -13,11 +13,11 @@ public class SetLayerColour : LayerSetting
 
     public override string Describe() => $"Would set {Layer} colour to {Colour}";
 
-    protected override void CheckMore(DrawingState drawing, List<string> problems)
+    protected override void CheckMore(DrawingState drawing, CheckResult result)
     {
         if (!int.TryParse(Colour, out var number) || number < 1 || number > 255)
         {
-            problems.Add($"Can't set {Layer} colour to {Colour}: use a number from 1 to 255");
+            result.Problem($"Can't set {Layer} colour to {Colour}: use a number from 1 to 255");
         }
     }
 }
@@ -31,15 +31,15 @@ public class SetLayerLinetype : LayerSetting
 
     public override string Describe() => $"Would set {Layer} linetype to {Linetype}";
 
-    protected override void CheckMore(DrawingState drawing, List<string> problems)
+    protected override void CheckMore(DrawingState drawing, CheckResult result)
     {
         if (drawing.Linetypes.Count == 0)
         {
-            problems.Add("Can't check linetypes: rescan the drawing with the latest scan file");
+            result.Problem("Can't check linetypes: rescan the drawing with the latest scan file");
         }
         else if (!drawing.Linetypes.Contains(Linetype))
         {
-            problems.Add($"Can't set {Layer} to {Linetype}: that linetype isn't loaded in this drawing");
+            result.Problem($"Can't set {Layer} to {Linetype}: that linetype isn't loaded in this drawing");
         }
     }
 }
@@ -60,14 +60,14 @@ public class SetLayerLineweight : LayerSetting
 
     public override string Describe() => $"Would set {Layer} lineweight to {Lineweight} mm";
 
-    protected override void CheckMore(DrawingState drawing, List<string> problems)
+    protected override void CheckMore(DrawingState drawing, CheckResult result)
     {
         var ok = decimal.TryParse(Lineweight, NumberStyles.Number, CultureInfo.InvariantCulture, out var value)
             && Allowed.Any(a => decimal.Parse(a, CultureInfo.InvariantCulture) == value);
 
         if (!ok)
         {
-            problems.Add($"Can't set {Layer} lineweight to {Lineweight}: use a standard mm value like 0.25 or 0.35");
+            result.Problem($"Can't set {Layer} lineweight to {Lineweight}: use a standard mm value like 0.25 or 0.35");
         }
     }
 }
@@ -81,11 +81,11 @@ public class SetLayerTransparency : LayerSetting
 
     public override string Describe() => $"Would set {Layer} transparency to {Transparency}";
 
-    protected override void CheckMore(DrawingState drawing, List<string> problems)
+    protected override void CheckMore(DrawingState drawing, CheckResult result)
     {
         if (!int.TryParse(Transparency, out var number) || number < 0 || number > 90)
         {
-            problems.Add($"Can't set {Layer} transparency to {Transparency}: use a number from 0 to 90");
+            result.Problem($"Can't set {Layer} transparency to {Transparency}: use a number from 0 to 90");
         }
     }
 }
@@ -99,11 +99,11 @@ public class SetLayerDescription : LayerSetting
 
     public override string Describe() => $"Would set {Layer} description to \"{Description}\"";
 
-    protected override void CheckMore(DrawingState drawing, List<string> problems)
+    protected override void CheckMore(DrawingState drawing, CheckResult result)
     {
         if (string.IsNullOrWhiteSpace(Description))
         {
-            problems.Add($"Can't set {Layer} description: it's empty");
+            result.Problem($"Can't set {Layer} description: it's empty");
         }
     }
 }
@@ -114,6 +114,15 @@ public class PlotLayer : LayerSetting
     protected override string[] Options => ["_Plot", "_Plot"];
 
     public override string Describe() => $"Would set {Layer} to plot";
+
+    protected override void CheckMore(DrawingState drawing, CheckResult result)
+    {
+        if (drawing.KnowsOnOffLockPlot && !drawing.NoPlot.Contains(Layer))
+        {
+            result.Note($"{Layer} already plots, so this step changes nothing");
+        }
+        drawing.NoPlot.Remove(Layer);
+    }
 }
 
 public class NoPlotLayer : LayerSetting
@@ -122,4 +131,13 @@ public class NoPlotLayer : LayerSetting
     protected override string[] Options => ["_Plot", "_No"];
 
     public override string Describe() => $"Would set {Layer} to not plot";
+
+    protected override void CheckMore(DrawingState drawing, CheckResult result)
+    {
+        if (drawing.KnowsOnOffLockPlot && drawing.NoPlot.Contains(Layer))
+        {
+            result.Note($"{Layer} is already set to not plot, so this step changes nothing");
+        }
+        drawing.NoPlot.Add(Layer);
+    }
 }

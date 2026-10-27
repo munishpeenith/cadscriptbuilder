@@ -7,15 +7,44 @@ public class DrawingState
     public HashSet<string> Layers { get; }
     public HashSet<string> Frozen { get; }
     public HashSet<string> Linetypes { get; }
+    public HashSet<string> Off { get; }
+    public HashSet<string> Locked { get; }
+    public HashSet<string> NoPlot { get; }
     public string? Current { get; set; }
+
+    // Older scans don't record everything, so some notes can't be trusted
+    public bool KnowsFrozen { get; }
+    public bool KnowsOnOffLockPlot { get; }
 
     public DrawingState(Scan scan)
     {
-        Layers = new HashSet<string>(scan.Layers, StringComparer.OrdinalIgnoreCase);
-        Frozen = new HashSet<string>(scan.Frozen, StringComparer.OrdinalIgnoreCase);
-        Linetypes = new HashSet<string>(scan.Linetypes, StringComparer.OrdinalIgnoreCase);
+        Layers = Copy(scan.Layers);
+        Frozen = Copy(scan.Frozen);
+        Linetypes = Copy(scan.Linetypes);
+        Off = Copy(scan.Off);
+        Locked = Copy(scan.Locked);
+        NoPlot = Copy(scan.NoPlot);
         Current = scan.Current;
+        KnowsFrozen = scan.Version >= 2;
+        KnowsOnOffLockPlot = scan.Version >= 3;
     }
+
+    // A copy of another pretend drawing (used to try a step before adding it)
+    public DrawingState(DrawingState other)
+    {
+        Layers = Copy(other.Layers);
+        Frozen = Copy(other.Frozen);
+        Linetypes = Copy(other.Linetypes);
+        Off = Copy(other.Off);
+        Locked = Copy(other.Locked);
+        NoPlot = Copy(other.NoPlot);
+        Current = other.Current;
+        KnowsFrozen = other.KnowsFrozen;
+        KnowsOnOffLockPlot = other.KnowsOnOffLockPlot;
+    }
+
+    private static HashSet<string> Copy(IEnumerable<string> items) =>
+        new HashSet<string>(items, StringComparer.OrdinalIgnoreCase);
 
     public bool HasLayer(string name) => Layers.Contains(name);
 
@@ -26,9 +55,12 @@ public class DrawingState
     {
         Layers.Remove(from);
         Layers.Add(to);
-        if (Frozen.Remove(from))
+        foreach (var set in new[] { Frozen, Off, Locked, NoPlot })
         {
-            Frozen.Add(to);
+            if (set.Remove(from))
+            {
+                set.Add(to);
+            }
         }
         if (IsCurrent(from))
         {
@@ -40,5 +72,8 @@ public class DrawingState
     {
         Layers.Remove(name);
         Frozen.Remove(name);
+        Off.Remove(name);
+        Locked.Remove(name);
+        NoPlot.Remove(name);
     }
 }

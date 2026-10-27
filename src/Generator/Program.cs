@@ -23,17 +23,23 @@ try
     if (args.Length >= 3)
     {
         var scan = Engine.ReadScan(args[2]);
-        var problems = Engine.Check(plan, scan);
+        var result = Engine.Check(plan, scan);
 
-        if (problems.Count > 0)
+        if (result.HasProblems)
         {
             Console.WriteLine($"The plan doesn't match {scan.Drawing}:");
-            foreach (var problem in problems)
+            foreach (var problem in result.Problems)
             {
                 Console.WriteLine($"  - {problem}");
             }
             Console.WriteLine("Nothing generated.");
             return;
+        }
+
+        // Notes don't stop anything, they're just worth knowing
+        foreach (var note in result.Notes)
+        {
+            Console.WriteLine($"Note: {note}");
         }
 
         Console.WriteLine($"Checked against {scan.Drawing}: OK");

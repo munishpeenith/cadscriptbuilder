@@ -23,7 +23,7 @@ namespace Core;
 [JsonDerivedType(typeof(SetLayerDescription), "setLayerDescription")]
 public abstract class Operation
 {
-    public abstract List<string> Check(DrawingState drawing);
+    public abstract CheckResult Check(DrawingState drawing);
     public abstract string Describe();
     public abstract string ToLisp();
 }

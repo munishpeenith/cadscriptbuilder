@@ -142,12 +142,19 @@
             </Border>
         </Grid>
 
-        <!-- Messages -->
-        <ui:InfoBar x:Name="Status"
-                    Grid.Row="3"
-                    Margin="0,16,0,0"
-                    IsClosable="False"
-                    IsOpen="True" />
+        <!-- Messages, and "Add anyway" when a step was held back -->
+        <DockPanel Grid.Row="3" Margin="0,16,0,0">
+            <ui:Button x:Name="AddAnywayButton"
+                       Margin="12,0,0,0"
+                       VerticalAlignment="Center"
+                       DockPanel.Dock="Right"
+                       Appearance="Secondary"
+                       Click="AddAnyway_Click"
+                       Content="Add anyway"
+                       Icon="{ui:SymbolIcon Add24}"
+                       Visibility="Collapsed" />
+            <ui:InfoBar x:Name="Status" IsClosable="False" IsOpen="True" />
+        </DockPanel>
 
         <!-- Generate, and the RUN tile that appears once the script is ready -->
         <Grid Grid.Row="4" Height="64" Margin="0,16,0,0">

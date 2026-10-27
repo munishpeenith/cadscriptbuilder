@@ -19,24 +19,24 @@ public abstract class LayerSetting : Operation
         return $"""(command "_.-LAYER" {string.Join(" ", words)} "")""";
     }
 
-    public override List<string> Check(DrawingState drawing)
+    public override CheckResult Check(DrawingState drawing)
     {
-        var problems = new List<string>();
+        var result = new CheckResult();
 
         if (!drawing.HasLayer(Layer))
         {
-            problems.Add($"Can't {Verb} {Layer}: there's no layer called {Layer}");
+            result.Problem($"Can't {Verb} {Layer}: there's no layer called {Layer}");
         }
         else
         {
-            CheckMore(drawing, problems);
+            CheckMore(drawing, result);
         }
 
-        return problems;
+        return result;
     }
 
     // Extra rules for one block, and where it updates the pretend drawing
-    protected virtual void CheckMore(DrawingState drawing, List<string> problems)
+    protected virtual void CheckMore(DrawingState drawing, CheckResult result)
     {
     }
 }
