@@ -8,7 +8,13 @@
     <Nullable>enable</Nullable>
     <AssemblyName>CADScriptBuilder</AssemblyName>
     <Version>0.1.0</Version>
+    <ApplicationIcon>csb.ico</ApplicationIcon>
   </PropertyGroup>
+
+  <ItemGroup>
+    <Resource Include="csb.ico" />
+    <Resource Include="csb.png" />
+  </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="WPF-UI" Version="4.*" />
