@@ -26,4 +26,15 @@ public abstract class Operation
     public abstract CheckResult Check(DrawingState drawing);
     public abstract string Describe();
     public abstract string ToLisp();
+
+    // What this step did, for the summary printed after a run: "Would freeze X" becomes "Freeze X"
+    public virtual string Done()
+    {
+        var text = Describe();
+        return text.StartsWith("Would ") ? char.ToUpper(text[6]) + text[7..] : text;
+    }
+
+    // The LISP that prints this step's line in the after-run summary.
+    // "later" is the steps that come after this one (some summaries need to know).
+    public virtual string SummaryLisp(IEnumerable<Operation> later) => $"""(princ "\n  - {Lisp.Escape(Done())}")""";
 }

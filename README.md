@@ -4,23 +4,52 @@ A tool that lets engineers build custom AutoCAD and Civil 3D automations from te
 dry run, a single undo and a log on every change. AI-assisted planning comes later; the engine comes
 first.
 
-*Last updated 22 October 2026.*
+*Last updated 27 October 2026.*
 
 ---
 
 ## Current status
 
-**Working now (hand-written AutoLISP, tested in Civil 3D 2027):**
+**Working now (tested in Civil 3D 2027):** a Windows app, a command line generator, and 17 layer
+blocks.
 
-- Scripts run the moment they are dropped onto a drawing.
-- Create, turn off and rename layers.
-- Several renames bundled into one undo step, reverted with a single `U`.
-- Dry run, then `Apply changes? [Yes/No]`, with No as the safe default.
-- Scan: the drawing's full layer list written out to a text file for the app to read.
+- **The app** (`src/Gui`, WPF with a Windows 11 look):
+  - Drag the SCAN tile into a drawing; the app syncs with it and shows *Connected: drawing.dwg*.
+  - Build steps from 17 layer blocks, plus *Rename by pattern* (find and replace across many layers).
+  - Dropdowns list only the layers that make sense for the block (Thaw shows frozen layers, and so on).
+  - Select several layers at once; steps are added in the order you tick them.
+  - Every step is checked against the drawing as it will be after the steps before it:
+    ✔ fine, ⚠ heads up (runs, but changes nothing), ✖ can't work (held back, *Add anyway* if meant).
+  - Drag steps to reorder, Delete to remove, double-click to edit, Clear all.
+  - Save plans and open them on other drawings; change drawing without losing your steps.
+  - *Generate* makes a RUN tile you drag straight into Civil 3D.
+  - Pin to keep it on top of Civil 3D; snaps side by side.
+- **Every generated script:** previews each change, asks `Apply changes? [Yes/No]` (No by default),
+  bundles everything into one undo, then prints a summary of what was done, including any purge
+  that didn't happen because the layer still had objects on it.
+- **The command line** (`src/Generator`) runs saved plans with the same checks.
 
-All of it is in [`lsp/`](lsp/), numbered in the order it was built.
+**Next:** AI mode, then a full Scratch-style block builder.
 
-**Next:** the generator, a C# console app that reads a plan file and writes a `.lsp`.
+---
+
+## Running it
+
+From the repo root:
+
+```
+dotnet run --project src/Gui                         # the app
+dotnet run --project src/Generator -- plans/rename-and-purge.json out/run.lsp $HOME/Documents/CADScriptBuilder/layers.txt
+```
+
+To build a standalone `.exe` to share (no .NET needed on the other PC):
+
+```
+dotnet publish src/Gui -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:EnableCompressionInSingleFile=true -p:DebugType=none -o publish
+```
+
+Keep `CADScriptBuilder.exe` and `csb_scan.lsp` together. The app is unsigned, so Windows shows
+*More info → Run anyway* the first time.
 
 ---
 
@@ -203,11 +232,12 @@ Because the plan is independent (section 4), it can be added later as a second w
 
 ### Scan and sync
 
-- `lsp/07_scrape_layers_to_write.lsp` writes the drawing name, then every layer, one per line, to
-  `src/layers.txt` in this repo. The file's modified time serves as "scanned at".
-- `src/layers.txt` is **gitignored**, so layer names from real drawings never reach GitHub.
-- Later, every generated script ends by writing the current layer list back, so refreshes are free
-  and see unsaved state.
+- `lsp/07_scrape_layers_to_write.lsp` (copied next to the app as `csb_scan.lsp`) writes the drawing
+  name, then every layer, to `Documents\CADScriptBuilder\layers.txt`. Lines starting with `*` carry
+  extra detail (layer names can't contain `*`): `*scan=3`, `*current=`, `*linetype=`, `*frozen=`,
+  `*off=`, `*locked=`, `*noplot=`. Older scans still load; checks that need missing detail are skipped.
+- The app watches that file and ticks green the moment a new scan lands.
+- Scans live outside the repo, so layer names from real drawings never reach GitHub.
 
 ---
 
@@ -265,12 +295,13 @@ locally and holds no project data.
    - [x] `05` Three renames in one undo (`05b`: control test proving the undo brackets are needed)
    - [x] `06` Dry run, then `Apply? [Yes/No]`
    - [x] `07` Scan the layer list to a file
-2. **Generator** *(next)*: a C# console app. Plan file in, `.lsp` out.
-3. **Second block** (purge a layer), chained with rename in one plan and one undo.
-4. **Sync:** the app reads `layers.txt` to fill dropdowns and refuse missing layers.
-5. **Block builder UI.**
-6. **Prompt mode (AI).**
-7. **COM Connect.** Smaller job than 6, so it can jump the queue for a quick win.
+2. **Generator** *(done)*: a C# console app. Plan file in, `.lsp` out.
+3. **Second block** *(done)*: purge, chained with rename in one plan and one undo.
+4. **Sync** *(done)*: plans checked against the scan; nothing generated if they don't match.
+5. **App** *(done)*: scan page, steps page, 17 layer blocks, smart checks, save/open plans.
+6. **Prompt mode (AI)** *(next)*.
+7. **Full Scratch-style block builder.**
+8. **COM Connect.** Smaller job than 6, so it can jump the queue for a quick win.
 
 **The milestone that decides the project:** one *generated* script, on a real Civil 3D drawing, doing
 what it said it would.
@@ -289,11 +320,12 @@ what it said it would.
 | Undo naming | **Not possible**; use a printed confirmation | AutoCAD labels bundles as `GROUP` |
 | Yes/No prompt | **`getkword`**, No as default | Reflex Enter or Space must be the safe key |
 
+| Plan file format | **JSON** | Structured, read natively by C#, and what blocks and AI will produce |
+| UI | **WPF + WPF-UI** (Windows 11 Fluent look) | Native drag and drop, single-file `.exe` |
+| Checks | **Problems block, notes don't** | Never generate a broken script, but don't nag about harmless steps |
+
 **Still open:**
 
-- Plan file format (JSON proposed: structured, read natively by C#, and what blocks and AI will
-  produce).
-- UI framework and look.
 - How templates are stored, versioned and tested.
 - Which operations make the version 1 library. The question for Ayub: what changes has he actually
   made by hand this year?
@@ -303,10 +335,12 @@ what it said it would.
 ## 15. Repo layout
 
 ```
-README.md     this file
-lsp/          hand-written AutoLISP, numbered in build order
-src/          the C# generator (coming next)
-  layers.txt  scan output, gitignored
+README.md         this file
+lsp/              hand-written AutoLISP, numbered in build order (07 is the scan script)
+plans/            example plans (JSON)
+src/Core/         the engine: plans, scans, checks, blocks (Operations/), LISP building
+src/Generator/    command line: plan + scan in, .lsp out
+src/Gui/          the Windows app
 ```
 
 ---

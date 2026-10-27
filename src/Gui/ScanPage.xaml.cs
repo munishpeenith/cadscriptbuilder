@@ -142,7 +142,7 @@ public partial class ScanPage : UserControl
     private void BuildSupportList()
     {
         AddSection("Layers", done: true,
-            "Rename layers",
+            "Rename layers, one at a time or by pattern (find and replace)",
             "Create new layers",
             "Purge empty layers",
             "Set the current layer",
@@ -155,25 +155,30 @@ public partial class ScanPage : UserControl
 
         AddSection("Safety", done: true,
             "Every step checked against your drawing before anything is made",
+            "Steps that can't work are held back (with Add anyway if you mean it)",
+            "Heads-up notes for steps that would change nothing",
             "Preview of every change, then a Yes/No before it runs",
             "One undo (U) reverses the whole script",
+            "A summary after each run, including anything that didn't happen",
             "Out-of-date scripts are removed automatically");
 
         AddSection("Workflow", done: true,
             "Drag-in scan that syncs with your drawing",
-            "Live ticks on every step",
-            "Layer search and dropdowns from your real layers",
+            "Change drawing without losing your steps",
+            "Dropdowns that only show layers that make sense for the block",
+            "Select several layers at once, in the order you tick them",
+            "Drag steps to reorder, Delete to remove, double-click to edit",
+            "Save plans and reuse them on other drawings",
             "Drag-out script, straight into Civil 3D",
+            "Stays on top of Civil 3D (pin), and snaps side by side",
             "Command line version that runs saved plans");
 
         AddSection("Coming soon", done: false,
+            "AI mode: describe what you want in plain English",
             "Drag-and-drop block builder",
             "Standards check (Uniclass, house and client naming)",
-            "AI mode: describe what you want in plain English",
             "Civil 3D styles and label styles",
             "Merge and delete layers",
-            "Summary of what changed after a run",
-            "Rescan button",
             "Drawing cleanup: purge, audit, xrefs",
             "Layouts and plotting",
             "Direct connection to Civil 3D, no dragging",

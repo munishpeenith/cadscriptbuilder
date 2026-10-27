@@ -18,12 +18,14 @@ public enum Suggest { Nothing, Layers, Linetypes, Lineweights }
 // One choice in the block dropdown: its name, the hints and suggestions for its boxes,
 // and how to build the block from what's typed. SecondHint is null for one-box blocks.
 // Show (optional) narrows the layer suggestions to the ones that make sense for this block.
+// Pattern blocks turn into several steps when added (one per matching layer).
 public record BlockChoice(
     string Name,
     string FirstHint, Suggest FirstSuggest,
     string? SecondHint, Suggest SecondSuggest,
     Func<string, string, Operation> Make,
-    Func<DrawingState, string, bool>? Show = null);
+    Func<DrawingState, string, bool>? Show = null,
+    bool Pattern = false);
 
 // Page 2: build the steps, see a live tick on each one, generate the script as a draggable tile.
 public partial class StepsPage : UserControl
@@ -37,6 +39,9 @@ public partial class StepsPage : UserControl
         new("Rename layer", "From layer", Suggest.Layers, "To layer", Suggest.Nothing,
             (a, b) => new RenameLayer { From = a, To = b },
             Show: (d, l) => !LayerRules.IsProtected(l)),
+        new("Rename by pattern", "Find text, e.g. C-", Suggest.Nothing, "Replace with, e.g. CIV-", Suggest.Nothing,
+            (a, b) => new RenameLayer { From = a, To = b },
+            Pattern: true),
         new("New layer", "New layer name", Suggest.Nothing, null, Suggest.Nothing,
             (a, _) => new NewLayer { Layer = a }),
         new("Purge layer", "Layer to purge", Suggest.Layers, null, Suggest.Nothing,
@@ -94,6 +99,18 @@ public partial class StepsPage : UserControl
     // Layers ticked in the picker, in the order they were ticked, and their number badges
     private readonly List<string> picked = new();
     private readonly Dictionary<string, TextBlock> pickedBadges = new(StringComparer.OrdinalIgnoreCase);
+
+    // Which step is being edited (double-click), or -1 when not editing
+    private int editingIndex = -1;
+
+    // Where a drag to reorder started
+    private Point dragStart;
+    private int dragFrom = -1;
+
+    // Where saved plans go by default
+    private static readonly string PlansFolder = Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
+        "CADScriptBuilder", "Plans");
 
     // Where the generated script is saved (overwritten each time)
     private readonly string runScript = Path.Combine(
@@ -166,7 +183,7 @@ public partial class StepsPage : UserControl
         Grid.SetColumnSpan(FirstArea, twoBoxes ? 1 : 2);
 
         // Picking several only makes sense for blocks that act on existing layers one at a time
-        SelectButton.IsEnabled = block.FirstSuggest == Suggest.Layers && block.Name != "Rename layer";
+        SelectButton.IsEnabled = block.FirstSuggest == Suggest.Layers && block.Name != "Rename layer" && !block.Pattern;
 
         UpdateSuggestions();
     }
@@ -238,19 +255,69 @@ public partial class StepsPage : UserControl
         var first = (FirstBox.Text ?? "").Trim();
         var second = (SecondBox.Text ?? "").Trim();
 
-        if (first == "" || (block.SecondHint is not null && second == ""))
+        if (first == "" || (block.SecondHint is not null && second == "" && !block.Pattern))
         {
-            var what = block.SecondHint is null ? "the box" : "both boxes";
+            var what = block.SecondHint is null || block.Pattern ? "the first box" : "both boxes";
             SetStatus(InfoBarSeverity.Warning, "Something's missing", $"Fill in {what} for {block.Name}.");
+            return;
+        }
+
+        // Editing an existing step: replace it where it is
+        if (editingIndex >= 0)
+        {
+            if (block.Pattern)
+            {
+                SetStatus(InfoBarSeverity.Warning, "Can't edit with a pattern",
+                    "Pick a single-step block to edit this step, or press Esc to cancel.");
+                return;
+            }
+
+            int index = editingIndex;
+            plan.Operations[index] = block.Make(first, second);
+            FirstBox.Text = "";
+            SecondBox.Text = "";
+            RefreshSteps();
+            StepsList.SelectedIndex = index;
+            return;
+        }
+
+        if (block.Pattern)
+        {
+            AddPatternRenames(first, second);
             return;
         }
 
         TryAddSteps([block.Make(first, second)]);
     }
 
+    // "Rename by pattern": one rename step for every layer containing the text
+    private void AddPatternRenames(string find, string replace)
+    {
+        var steps = after.Layers
+            .Where(name => !LayerRules.IsProtected(name) && name.Contains(find, StringComparison.OrdinalIgnoreCase))
+            .OrderBy(name => name, StringComparer.OrdinalIgnoreCase)
+            .Select(name => new RenameLayer { From = name, To = name.Replace(find, replace, StringComparison.OrdinalIgnoreCase) })
+            .Where(rename => rename.From != rename.To)
+            .ToList();
+
+        if (steps.Count == 0)
+        {
+            SetStatus(InfoBarSeverity.Warning, "Nothing to rename", $"No layers contain \"{find}\".");
+            return;
+        }
+
+        var (added, held) = TryAddSteps(steps.Cast<Operation>().ToList());
+        if (held == 0)
+        {
+            var preview = string.Join(", ", steps.Take(4).Select(r => $"{r.From} → {r.To}"));
+            var more = steps.Count > 4 ? $" and {steps.Count - 4} more" : "";
+            SetStatus(InfoBarSeverity.Success, $"Added {added} renames", preview + more + ".");
+        }
+    }
+
     // Check each step against the drawing as it'll be (including the ones just before it).
     // Steps that work, or only have notes, are added. Ones that can't work are held back.
-    private void TryAddSteps(List<Operation> steps)
+    private (int Added, int Held) TryAddSteps(List<Operation> steps)
     {
         var trial = new DrawingState(after);
         var good = new List<Operation>();
@@ -284,6 +351,8 @@ public partial class StepsPage : UserControl
             var title = held.Count == 1 ? "1 step not added" : $"{held.Count} steps not added";
             SetStatus(InfoBarSeverity.Error, title, string.Join(Environment.NewLine, reasons));
         }
+
+        return (good.Count, held.Count);
     }
 
     // Add them even though they can't work yet (e.g. they're meant for a different drawing)
@@ -403,7 +472,9 @@ public partial class StepsPage : UserControl
         PickerPopup.IsOpen = false;
     }
 
-    private void RemoveButton_Click(object sender, RoutedEventArgs e)
+    private void RemoveButton_Click(object sender, RoutedEventArgs e) => RemoveSelected();
+
+    private void RemoveSelected()
     {
         int i = StepsList.SelectedIndex;
         if (i < 0)
@@ -414,6 +485,231 @@ public partial class StepsPage : UserControl
 
         plan.Operations.RemoveAt(i);
         RefreshSteps();
+        StepsList.SelectedIndex = Math.Min(i, plan.Operations.Count - 1);
+    }
+
+    // ---- The steps list: Delete key, double-click to edit, drag to reorder ----
+
+    private void StepsList_KeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key == Key.Delete)
+        {
+            RemoveSelected();
+            e.Handled = true;
+        }
+    }
+
+    private void StepsList_DoubleClick(object sender, MouseButtonEventArgs e)
+    {
+        int i = StepsList.SelectedIndex;
+        if (i < 0)
+        {
+            return;
+        }
+
+        // Load the step into the boxes above; Add becomes Update
+        var step = plan.Operations[i];
+        int blockIndex = Array.FindIndex(Blocks, b => !b.Pattern && b.Make("x", "y").GetType() == step.GetType());
+        if (blockIndex < 0)
+        {
+            return;
+        }
+
+        BlockBox.SelectedIndex = blockIndex;
+        var (first, second) = ValuesOf(step);
+        FirstBox.Text = first;
+        SecondBox.Text = second;
+        CloseDropdowns();
+
+        editingIndex = i;
+        AddButton.Content = "Update";
+        SetStatus(InfoBarSeverity.Informational, $"Editing step {i + 1}",
+            "Change it above and press Update. Esc cancels.");
+    }
+
+    // The values a step was made from, to put back in the boxes when editing
+    private static (string First, string Second) ValuesOf(Operation step) => step switch
+    {
+        RenameLayer r => (r.From, r.To),
+        NewLayer n => (n.Layer, ""),
+        PurgeLayer p => (p.Layer, ""),
+        SetLayerColour c => (c.Layer, c.Colour),
+        SetLayerLinetype t => (t.Layer, t.Linetype),
+        SetLayerLineweight w => (w.Layer, w.Lineweight),
+        SetLayerTransparency t => (t.Layer, t.Transparency),
+        SetLayerDescription d => (d.Layer, d.Description),
+        LayerSetting other => (other.Layer, ""),
+        _ => ("", "")
+    };
+
+    private void EndEdit()
+    {
+        editingIndex = -1;
+        AddButton.Content = "Add";
+    }
+
+    // Esc: stop editing, and close any dropdowns
+    private void Page_KeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key != Key.Escape)
+        {
+            return;
+        }
+
+        CloseDropdowns();
+        if (editingIndex >= 0)
+        {
+            FirstBox.Text = "";
+            SecondBox.Text = "";
+            RefreshSteps();
+            e.Handled = true;
+        }
+    }
+
+    private void StepsList_MouseDown(object sender, MouseButtonEventArgs e)
+    {
+        dragStart = e.GetPosition(null);
+        dragFrom = IndexOfItemAt(e.OriginalSource as DependencyObject);
+    }
+
+    private void StepsList_MouseMove(object sender, MouseEventArgs e)
+    {
+        if (e.LeftButton != MouseButtonState.Pressed || dragFrom < 0)
+        {
+            return;
+        }
+
+        // Only start a drag once the mouse has actually moved a little
+        var now = e.GetPosition(null);
+        if (Math.Abs(now.X - dragStart.X) < SystemParameters.MinimumHorizontalDragDistance &&
+            Math.Abs(now.Y - dragStart.Y) < SystemParameters.MinimumVerticalDragDistance)
+        {
+            return;
+        }
+
+        int from = dragFrom;
+        dragFrom = -1;
+        DragDrop.DoDragDrop(StepsList, new DataObject("csb-step", from), DragDropEffects.Move);
+    }
+
+    private void StepsList_DragOver(object sender, DragEventArgs e)
+    {
+        if (!e.Data.GetDataPresent("csb-step"))
+        {
+            e.Effects = DragDropEffects.None;
+            e.Handled = true;
+            return;
+        }
+
+        // Highlight the step it'll land beside
+        e.Effects = DragDropEffects.Move;
+        StepsList.SelectedIndex = Math.Min(DropIndex(e), plan.Operations.Count - 1);
+        e.Handled = true;
+    }
+
+    private void StepsList_Drop(object sender, DragEventArgs e)
+    {
+        if (!e.Data.GetDataPresent("csb-step"))
+        {
+            return;
+        }
+
+        int from = (int)e.Data.GetData("csb-step");
+        int to = DropIndex(e);
+        if (to > from)
+        {
+            to--;   // removing it first shifts everything after it up by one
+        }
+        if (to == from)
+        {
+            return;
+        }
+
+        var step = plan.Operations[from];
+        plan.Operations.RemoveAt(from);
+        plan.Operations.Insert(to, step);
+        RefreshSteps();
+        StepsList.SelectedIndex = to;
+    }
+
+    // Which step (if any) a point in the list belongs to
+    private int IndexOfItemAt(DependencyObject? element)
+    {
+        if (element is not Visual)
+        {
+            return -1;
+        }
+        return ItemsControl.ContainerFromElement(StepsList, element) is ListViewItem item
+            ? StepsList.ItemContainerGenerator.IndexFromContainer(item)
+            : -1;
+    }
+
+    // Where a dropped step goes: before the step under the mouse, or after it if in its lower half
+    private int DropIndex(DragEventArgs e)
+    {
+        var element = StepsList.InputHitTest(e.GetPosition(StepsList)) as DependencyObject;
+        if (element is Visual && ItemsControl.ContainerFromElement(StepsList, element) is ListViewItem item)
+        {
+            int index = StepsList.ItemContainerGenerator.IndexFromContainer(item);
+            return e.GetPosition(item).Y > item.ActualHeight / 2 ? index + 1 : index;
+        }
+        return plan.Operations.Count;
+    }
+
+    // ---- Save and open plans ----
+
+    private void SavePlan_Click(object sender, RoutedEventArgs e)
+    {
+        if (plan.Operations.Count == 0)
+        {
+            SetStatus(InfoBarSeverity.Informational, "Nothing to save", "Add some steps first.");
+            return;
+        }
+
+        Directory.CreateDirectory(PlansFolder);
+        var dialog = new Microsoft.Win32.SaveFileDialog
+        {
+            Title = "Save plan",
+            Filter = "CADScriptBuilder plans (*.json)|*.json",
+            InitialDirectory = PlansFolder,
+            FileName = "my-plan.json"
+        };
+        if (dialog.ShowDialog() != true)
+        {
+            return;
+        }
+
+        Engine.SavePlan(plan, dialog.FileName);
+        SetStatus(InfoBarSeverity.Success, "Plan saved",
+            $"Saved {plan.Operations.Count} steps as {Path.GetFileName(dialog.FileName)}. Open it on any drawing.");
+    }
+
+    private void OpenPlan_Click(object sender, RoutedEventArgs e)
+    {
+        Directory.CreateDirectory(PlansFolder);
+        var dialog = new Microsoft.Win32.OpenFileDialog
+        {
+            Title = "Open plan",
+            Filter = "CADScriptBuilder plans (*.json)|*.json",
+            InitialDirectory = PlansFolder
+        };
+        if (dialog.ShowDialog() != true)
+        {
+            return;
+        }
+
+        try
+        {
+            var loaded = Engine.ReadPlan(dialog.FileName);
+            plan.AskBeforeRunning = loaded.AskBeforeRunning;
+            plan.Operations.Clear();
+            plan.Operations.AddRange(loaded.Operations);
+            RefreshSteps();
+        }
+        catch (InvalidDataException ex)
+        {
+            SetStatus(InfoBarSeverity.Error, "Couldn't open that plan", ex.Message);
+        }
     }
 
     // Start again: remove every step (and the old script with them)
@@ -441,6 +737,7 @@ public partial class StepsPage : UserControl
         }
 
         CancelPending();
+        EndEdit();
 
         // A pretend copy of the drawing that the steps change as they're checked
         var drawing = new DrawingState(scan);

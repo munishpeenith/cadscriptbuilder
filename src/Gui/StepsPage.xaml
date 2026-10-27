@@ -3,7 +3,8 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
              Background="Transparent"
-             MouseDown="Page_MouseDown">
+             MouseDown="Page_MouseDown"
+             PreviewKeyDown="Page_KeyDown">
     <Grid Margin="28,4,28,24">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
@@ -112,6 +113,18 @@
 
             <DockPanel Grid.Row="0" Margin="0,0,0,8">
                 <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                    <ui:Button x:Name="OpenButton"
+                               Margin="0,0,8,0"
+                               Appearance="Secondary"
+                               Click="OpenPlan_Click"
+                               Icon="{ui:SymbolIcon FolderOpen24}"
+                               ToolTip="Open a saved plan" />
+                    <ui:Button x:Name="SaveButton"
+                               Margin="0,0,8,0"
+                               Appearance="Secondary"
+                               Click="SavePlan_Click"
+                               Icon="{ui:SymbolIcon Save24}"
+                               ToolTip="Save these steps as a plan, to reuse on other drawings" />
                     <ui:Button x:Name="ClearButton"
                                Margin="0,0,8,0"
                                Appearance="Secondary"
@@ -136,7 +149,18 @@
                     BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}"
                     BorderThickness="1"
                     CornerRadius="8">
-                <ui:ListView x:Name="StepsList" Margin="4" Background="Transparent" BorderThickness="0">
+                <ui:ListView x:Name="StepsList"
+                             Margin="4"
+                             AllowDrop="True"
+                             Background="Transparent"
+                             BorderThickness="0"
+                             DragOver="StepsList_DragOver"
+                             Drop="StepsList_Drop"
+                             KeyDown="StepsList_KeyDown"
+                             MouseDoubleClick="StepsList_DoubleClick"
+                             PreviewMouseLeftButtonDown="StepsList_MouseDown"
+                             PreviewMouseMove="StepsList_MouseMove"
+                             ToolTip="Drag to reorder · Delete to remove · Double-click to edit">
                     <ui:ListView.ItemTemplate>
                         <DataTemplate>
                             <StackPanel Margin="4,6" Orientation="Horizontal">

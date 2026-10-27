@@ -14,6 +14,18 @@ public static class Engine
         AllowOutOfOrderMetadataProperties = true
     };
 
+    // How saved plans are written: neat, indented, camelCase like the hand-written ones
+    private static readonly JsonSerializerOptions SaveOptions = new()
+    {
+        WriteIndented = true,
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+    };
+
+    public static void SavePlan(Plan plan, string path)
+    {
+        File.WriteAllText(path, JsonSerializer.Serialize(plan, SaveOptions));
+    }
+
     public static Plan ReadPlan(string path)
     {
         if (!File.Exists(path))
@@ -136,7 +148,15 @@ public static class Engine
         }
 
         lisp.AppendLine("""      (command "_.UNDO" "_END")""");
-        lisp.AppendLine("""      (princ "\nCADScriptBuilder: done. Type U once to undo."))""");
+
+        // After running: a summary of what was done
+        var changes = plan.Operations.Count == 1 ? "1 change" : $"{plan.Operations.Count} changes";
+        lisp.AppendLine($"""      (princ "\nCADScriptBuilder: done, {changes}:")""");
+        for (int i = 0; i < plan.Operations.Count; i++)
+        {
+            lisp.AppendLine($"      {plan.Operations[i].SummaryLisp(plan.Operations.Skip(i + 1))}");
+        }
+        lisp.AppendLine("""      (princ "\nType U once to undo all of it."))""");
         lisp.AppendLine("""    (princ "\nCancelled. Nothing changed."))""");
         lisp.AppendLine("""  (princ))""");
         lisp.AppendLine("(c:CSB_RUN)");
