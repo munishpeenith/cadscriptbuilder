@@ -70,9 +70,21 @@
 
                 <ComboBox x:Name="BlockBox" Grid.Column="0" MaxDropDownHeight="420" />
 
-                <ui:AutoSuggestBox x:Name="FirstBox" Grid.Column="1" Margin="8,0,0,0"
-                                   Icon="{ui:SymbolIcon ChevronDown24}"
-                                   PreviewMouseLeftButtonUp="SuggestBox_Click" />
+                <!-- The layer box, with "Select" for picking several layers at once -->
+                <DockPanel x:Name="FirstArea" Grid.Column="1" Margin="8,0,0,0">
+                    <ui:Button x:Name="SelectButton"
+                               Margin="6,0,0,0"
+                               VerticalAlignment="Stretch"
+                               DockPanel.Dock="Right"
+                               Appearance="Secondary"
+                               Click="SelectButton_Click"
+                               Icon="{ui:SymbolIcon CheckboxChecked24}"
+                               ToolTip="Select several layers at once" />
+                    <ui:AutoSuggestBox x:Name="FirstBox"
+                                       Icon="{ui:SymbolIcon ChevronDown24}"
+                                       PreviewMouseLeftButtonUp="SuggestBox_Click" />
+                </DockPanel>
+
                 <ui:AutoSuggestBox x:Name="SecondBox" Grid.Column="2" Margin="8,0,0,0"
                                    Icon="{ui:SymbolIcon ChevronDown24}"
                                    PreviewMouseLeftButtonUp="SuggestBox_Click" />
@@ -201,5 +213,45 @@
                 </StackPanel>
             </Border>
         </Grid>
+        <!-- The multi-select picker: tick layers, they're numbered in the order you tick them -->
+        <Popup x:Name="PickerPopup"
+               AllowsTransparency="True"
+               Placement="Bottom"
+               PlacementTarget="{Binding ElementName=FirstArea}"
+               StaysOpen="False">
+            <Border Width="380"
+                    Margin="0,6,0,0"
+                    Padding="12"
+                    Background="{DynamicResource FlyoutBackground}"
+                    BorderBrush="{DynamicResource FlyoutBorderBrush}"
+                    BorderThickness="1"
+                    CornerRadius="8">
+                <StackPanel>
+                    <ui:TextBox x:Name="PickerSearch" PlaceholderText="Search layers" />
+                    <ScrollViewer MaxHeight="260"
+                                  Margin="0,8,0,8"
+                                  VerticalScrollBarVisibility="Auto">
+                        <StackPanel x:Name="PickerList" />
+                    </ScrollViewer>
+                    <DockPanel>
+                        <ui:Button x:Name="PickerAddButton"
+                                   DockPanel.Dock="Right"
+                                   Appearance="Primary"
+                                   Click="PickerAdd_Click"
+                                   Content="Add"
+                                   IsEnabled="False" />
+                        <ui:Button Margin="0,0,8,0"
+                                   DockPanel.Dock="Right"
+                                   Appearance="Secondary"
+                                   Click="PickerCancel_Click"
+                                   Content="Cancel" />
+                        <TextBlock x:Name="PickerCount"
+                                   VerticalAlignment="Center"
+                                   Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                   Text="Tick layers in the order you want them" />
+                    </DockPanel>
+                </StackPanel>
+            </Border>
+        </Popup>
     </Grid>
 </UserControl>

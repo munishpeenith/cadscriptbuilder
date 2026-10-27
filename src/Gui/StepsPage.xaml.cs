@@ -88,8 +88,12 @@ public partial class StepsPage : UserControl
     // The pretend drawing after all the steps so far (feeds the suggestions)
     private DrawingState after;
 
-    // A step that failed its check, waiting in case the user clicks "Add anyway"
-    private Operation? pendingStep;
+    // Steps that failed their check, waiting in case the user clicks "Add anyway"
+    private readonly List<Operation> pendingSteps = new();
+
+    // Layers ticked in the picker, in the order they were ticked, and their number badges
+    private readonly List<string> picked = new();
+    private readonly Dictionary<string, TextBlock> pickedBadges = new(StringComparer.OrdinalIgnoreCase);
 
     // Where the generated script is saved (overwritten each time)
     private readonly string runScript = Path.Combine(
@@ -108,6 +112,7 @@ public partial class StepsPage : UserControl
         BlockBox.SelectedIndex = 0;
         BlockBox.SelectionChanged += (sender, e) => UpdateBoxes();
         FirstBox.TextChanged += (sender, e) => CancelPending();
+        PickerSearch.TextChanged += (sender, e) => BuildPickerList();
         SecondBox.TextChanged += (sender, e) => CancelPending();
 
         UpdateBoxes();
@@ -145,7 +150,10 @@ public partial class StepsPage : UserControl
         FirstBox.PlaceholderText = block.FirstHint;
         SecondBox.PlaceholderText = block.SecondHint ?? "";
         SecondBox.Visibility = twoBoxes ? Visibility.Visible : Visibility.Collapsed;
-        Grid.SetColumnSpan(FirstBox, twoBoxes ? 1 : 2);
+        Grid.SetColumnSpan(FirstArea, twoBoxes ? 1 : 2);
+
+        // Picking several only makes sense for blocks that act on existing layers one at a time
+        SelectButton.IsEnabled = block.FirstSuggest == Suggest.Layers && block.Name != "Rename layer";
 
         UpdateSuggestions();
     }
@@ -204,33 +212,59 @@ public partial class StepsPage : UserControl
             return;
         }
 
-        var step = block.Make(first, second);
-
-        // Try the step on a copy of the drawing (as it'll be after the steps so far) before adding it
-        var trial = step.Check(new DrawingState(after));
-        if (trial.HasProblems)
-        {
-            pendingStep = step;
-            AddAnywayButton.Visibility = Visibility.Visible;
-            SetStatus(InfoBarSeverity.Error, "Not added", string.Join(Environment.NewLine, trial.Problems));
-            return;
-        }
-
-        AddStep(step);
+        TryAddSteps([block.Make(first, second)]);
     }
 
-    // Add it even though it can't work yet (e.g. it's meant for a different drawing)
+    // Check each step against the drawing as it'll be (including the ones just before it).
+    // Steps that work, or only have notes, are added. Ones that can't work are held back.
+    private void TryAddSteps(List<Operation> steps)
+    {
+        var trial = new DrawingState(after);
+        var good = new List<Operation>();
+        var held = new List<Operation>();
+        var reasons = new List<string>();
+
+        foreach (var step in steps)
+        {
+            var result = step.Check(trial);
+            if (result.HasProblems)
+            {
+                held.Add(step);
+                reasons.AddRange(result.Problems);
+            }
+            else
+            {
+                good.Add(step);
+            }
+        }
+
+        if (good.Count > 0)
+        {
+            AddSteps(good);
+        }
+
+        if (held.Count > 0)
+        {
+            pendingSteps.Clear();
+            pendingSteps.AddRange(held);
+            AddAnywayButton.Visibility = Visibility.Visible;
+            var title = held.Count == 1 ? "1 step not added" : $"{held.Count} steps not added";
+            SetStatus(InfoBarSeverity.Error, title, string.Join(Environment.NewLine, reasons));
+        }
+    }
+
+    // Add them even though they can't work yet (e.g. they're meant for a different drawing)
     private void AddAnyway_Click(object sender, RoutedEventArgs e)
     {
-        if (pendingStep is not null)
+        if (pendingSteps.Count > 0)
         {
-            AddStep(pendingStep);
+            AddSteps(pendingSteps.ToList());
         }
     }
 
-    private void AddStep(Operation step)
+    private void AddSteps(List<Operation> steps)
     {
-        plan.Operations.Add(step);
+        plan.Operations.AddRange(steps);
 
         FirstBox.Text = "";
         SecondBox.Text = "";
@@ -238,11 +272,102 @@ public partial class StepsPage : UserControl
         RefreshSteps();
     }
 
-    // The step waiting for "Add anyway" is forgotten as soon as anything changes
+    // Steps waiting for "Add anyway" are forgotten as soon as anything changes
     private void CancelPending()
     {
-        pendingStep = null;
+        pendingSteps.Clear();
         AddAnywayButton.Visibility = Visibility.Collapsed;
+    }
+
+    // ---- The multi-select picker ----
+
+    private void SelectButton_Click(object sender, RoutedEventArgs e)
+    {
+        picked.Clear();
+        PickerSearch.Text = "";
+        BuildPickerList();
+        PickerPopup.IsOpen = true;
+    }
+
+    // Fill the picker with this block's layers (filtered by the search box), keeping what's ticked
+    private void BuildPickerList()
+    {
+        PickerList.Children.Clear();
+        pickedBadges.Clear();
+
+        var search = (PickerSearch.Text ?? "").Trim();
+        var layers = SuggestionsFor(SelectedBlock.FirstSuggest, SelectedBlock.Show)
+            .Cast<string>()
+            .Where(name => search == "" || name.Contains(search, StringComparison.OrdinalIgnoreCase));
+
+        foreach (var name in layers)
+        {
+            var badge = new TextBlock
+            {
+                Width = 24,
+                VerticalAlignment = VerticalAlignment.Center,
+                FontWeight = FontWeights.SemiBold,
+                TextAlignment = TextAlignment.Center
+            };
+            badge.SetResourceReference(TextBlock.ForegroundProperty, "AccentTextFillColorPrimaryBrush");
+            pickedBadges[name] = badge;
+
+            var box = new CheckBox { Content = name, IsChecked = picked.Contains(name), Margin = new Thickness(0, 2, 0, 2) };
+            box.Checked += (sender, e) => { if (!picked.Contains(name)) picked.Add(name); UpdatePicker(); };
+            box.Unchecked += (sender, e) => { picked.Remove(name); UpdatePicker(); };
+
+            var row = new DockPanel();
+            DockPanel.SetDock(badge, Dock.Left);
+            row.Children.Add(badge);
+            row.Children.Add(box);
+            PickerList.Children.Add(row);
+        }
+
+        UpdatePicker();
+    }
+
+    // Show 1, 2, 3... beside the ticked layers, and the count on the Add button
+    private void UpdatePicker()
+    {
+        foreach (var (name, badge) in pickedBadges)
+        {
+            int position = picked.FindIndex(p => string.Equals(p, name, StringComparison.OrdinalIgnoreCase));
+            badge.Text = position >= 0 ? (position + 1).ToString() : "";
+        }
+
+        PickerAddButton.IsEnabled = picked.Count > 0;
+        PickerAddButton.Content = picked.Count switch
+        {
+            0 => "Add",
+            1 => "Add 1 step",
+            _ => $"Add {picked.Count} steps"
+        };
+        PickerCount.Text = picked.Count == 0 ? "Tick layers in the order you want them" : $"{picked.Count} selected";
+    }
+
+    private void PickerAdd_Click(object sender, RoutedEventArgs e)
+    {
+        var block = SelectedBlock;
+        var second = (SecondBox.Text ?? "").Trim();
+
+        if (block.SecondHint is not null && second == "")
+        {
+            PickerPopup.IsOpen = false;
+            SetStatus(InfoBarSeverity.Warning, "Something's missing",
+                $"Fill in {block.SecondHint} first. It's used for every layer you picked.");
+            return;
+        }
+
+        var steps = picked.Select(name => block.Make(name, second)).ToList();
+        picked.Clear();
+        PickerPopup.IsOpen = false;
+        TryAddSteps(steps);
+    }
+
+    private void PickerCancel_Click(object sender, RoutedEventArgs e)
+    {
+        picked.Clear();
+        PickerPopup.IsOpen = false;
     }
 
     private void RemoveButton_Click(object sender, RoutedEventArgs e)
