@@ -1,0 +1,155 @@
+<UserControl x:Class="Gui.StepsPage"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml">
+    <Grid Margin="28,4,28,24">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <!-- Header -->
+        <StackPanel Grid.Row="0" Margin="0,0,0,16">
+            <TextBlock FontSize="24"
+                       FontWeight="SemiBold"
+                       Foreground="{DynamicResource TextFillColorPrimaryBrush}"
+                       Text="Build your steps" />
+            <TextBlock x:Name="DrawingText"
+                       Margin="0,4,0,0"
+                       FontSize="13"
+                       Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+        </StackPanel>
+
+        <!-- Pick a block, fill in its boxes, Add -->
+        <ui:Card Grid.Row="1" Padding="16">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="140" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <ComboBox x:Name="BlockBox" Grid.Column="0">
+                    <ComboBoxItem Content="Rename layer" />
+                    <ComboBoxItem Content="Purge layer" />
+                </ComboBox>
+
+                <ui:TextBox x:Name="FirstBox" Grid.Column="1" Margin="8,0,0,0" />
+                <ui:TextBox x:Name="SecondBox" Grid.Column="2" Margin="8,0,0,0" PlaceholderText="To layer" />
+
+                <ui:Button x:Name="AddButton"
+                           Grid.Column="3"
+                           Margin="8,0,0,0"
+                           VerticalAlignment="Stretch"
+                           Appearance="Primary"
+                           Click="AddButton_Click"
+                           Content="Add"
+                           Icon="{ui:SymbolIcon Add24}"
+                           IsDefault="True" />
+            </Grid>
+        </ui:Card>
+
+        <!-- The steps, each with a tick or a cross -->
+        <Grid Grid.Row="2" Margin="0,20,0,0">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
+
+            <DockPanel Grid.Row="0" Margin="0,0,0,8">
+                <ui:Button x:Name="RemoveButton"
+                           DockPanel.Dock="Right"
+                           Appearance="Secondary"
+                           Click="RemoveButton_Click"
+                           Content="Remove"
+                           Icon="{ui:SymbolIcon Delete24}" />
+                <TextBlock VerticalAlignment="Center"
+                           FontSize="16"
+                           FontWeight="SemiBold"
+                           Foreground="{DynamicResource TextFillColorPrimaryBrush}"
+                           Text="Steps" />
+            </DockPanel>
+
+            <Border Grid.Row="1"
+                    Background="{DynamicResource CardBackgroundFillColorDefaultBrush}"
+                    BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}"
+                    BorderThickness="1"
+                    CornerRadius="8">
+                <ListView x:Name="StepsList" Margin="4">
+                    <ListView.ItemTemplate>
+                        <DataTemplate>
+                            <StackPanel Margin="4,6" Orientation="Horizontal">
+                                <ui:SymbolIcon Margin="0,0,12,0"
+                                               VerticalAlignment="Center"
+                                               FontSize="18"
+                                               Foreground="{Binding Color}"
+                                               Symbol="{Binding Icon}" />
+                                <TextBlock VerticalAlignment="Center"
+                                           FontSize="14"
+                                           Foreground="{DynamicResource TextFillColorPrimaryBrush}"
+                                           Text="{Binding Text}" />
+                            </StackPanel>
+                        </DataTemplate>
+                    </ListView.ItemTemplate>
+                </ListView>
+            </Border>
+        </Grid>
+
+        <!-- Messages -->
+        <ui:InfoBar x:Name="Status"
+                    Grid.Row="3"
+                    Margin="0,16,0,0"
+                    IsClosable="False"
+                    IsOpen="True" />
+
+        <!-- Generate, and the RUN tile that appears once the script is ready -->
+        <Grid Grid.Row="4" Height="64" Margin="0,16,0,0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+
+            <ui:Button x:Name="GenerateButton"
+                       Grid.Column="0"
+                       Padding="22,12"
+                       VerticalAlignment="Center"
+                       Appearance="Primary"
+                       Click="GenerateButton_Click"
+                       Content="Generate script"
+                       Icon="{ui:SymbolIcon Play24}" />
+
+            <Border x:Name="RunTile"
+                    Grid.Column="1"
+                    Margin="16,0,0,0"
+                    Padding="16,0"
+                    Background="{DynamicResource CardBackgroundFillColorDefaultBrush}"
+                    BorderBrush="{DynamicResource AccentFillColorDefaultBrush}"
+                    BorderThickness="2"
+                    CornerRadius="10"
+                    Cursor="Hand"
+                    MouseMove="RunTile_MouseMove"
+                    ToolTip="Drag me into your drawing"
+                    Visibility="Collapsed">
+                <StackPanel VerticalAlignment="Center" Orientation="Horizontal">
+                    <ui:SymbolIcon Margin="0,0,12,0"
+                                   FontSize="30"
+                                   Foreground="{DynamicResource AccentFillColorDefaultBrush}"
+                                   Symbol="Document24" />
+                    <StackPanel VerticalAlignment="Center">
+                        <TextBlock FontSize="14"
+                                   FontWeight="SemiBold"
+                                   Foreground="{DynamicResource TextFillColorPrimaryBrush}"
+                                   Text="RUN  ·  csb_run.lsp" />
+                        <TextBlock FontSize="12"
+                                   Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                   Text="Drag into Civil 3D to run it" />
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+        </Grid>
+    </Grid>
+</UserControl>
