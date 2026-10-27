@@ -117,7 +117,20 @@ public partial class StepsPage : UserControl
 
         UpdateBoxes();
         RefreshSteps();
+
+        // Switching to another window (e.g. Civil 3D) closes any open dropdown too
+        Loaded += (sender, e) =>
+        {
+            var window = Window.GetWindow(this);
+            if (window is not null && !watchingWindow)
+            {
+                window.Deactivated += (s, a) => CloseDropdowns();
+                watchingWindow = true;
+            }
+        };
     }
+
+    private bool watchingWindow;
 
     // Back from the scan page with a new (or fresh) scan: keep the steps, re-check them
     public void UseScan(Scan newScan)
@@ -190,6 +203,13 @@ public partial class StepsPage : UserControl
             return;
         }
 
+        // Clicking the box again (e.g. the arrow) while it's open closes it
+        if (box.IsSuggestionListOpen)
+        {
+            box.IsSuggestionListOpen = false;
+            return;
+        }
+
         if (box.OriginalItemsSource.Count == 0)
         {
             return;
@@ -197,6 +217,19 @@ public partial class StepsPage : UserControl
 
         box.ItemsSource = box.OriginalItemsSource;
         box.IsSuggestionListOpen = true;
+    }
+
+    // A click on empty space anywhere on the page closes any open dropdown
+    private void Page_MouseDown(object sender, MouseButtonEventArgs e)
+    {
+        CloseDropdowns();
+        Keyboard.ClearFocus();
+    }
+
+    private void CloseDropdowns()
+    {
+        FirstBox.IsSuggestionListOpen = false;
+        SecondBox.IsSuggestionListOpen = false;
     }
 
     private void AddButton_Click(object sender, RoutedEventArgs e)
