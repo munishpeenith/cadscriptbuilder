@@ -5,3 +5,4 @@ out/
 src/layers.txt
 publish/*.zip
 versions/
+exe/
