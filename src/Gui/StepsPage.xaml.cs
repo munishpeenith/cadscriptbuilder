@@ -119,8 +119,8 @@ public partial class StepsPage : UserControl
         Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
         "CADScriptBuilder", "layers.txt");
 
-    // The scan script, next to the .exe (copied there by Gui.csproj)
-    private static readonly string ScanScript = Path.Combine(AppContext.BaseDirectory, "csb_scan.lsp");
+    // The scan script, written out to Documents by the app when it starts
+    private static readonly string ScanScript = ScanFile.Path;
 
     // The ⚙ choices, and the blocks they leave showing in the dropdown
     private readonly Settings settings = Settings.Load();
@@ -213,9 +213,11 @@ public partial class StepsPage : UserControl
 
     private void SettingsButton_Click(object sender, RoutedEventArgs e)
     {
-        SettingsPanel.Children.Clear();
-        BuildSettings();
-        SettingsPopup.IsOpen = !SettingsPopup.IsOpen;
+        PopupToggle.Toggle(SettingsPopup, beforeOpen: () =>
+        {
+            SettingsPanel.Children.Clear();
+            BuildSettings();
+        });
     }
 
     // Built in code, like the help: one checkbox per block, then the advanced options.
@@ -300,7 +302,7 @@ public partial class StepsPage : UserControl
 
     private void RefreshButton_Click(object sender, RoutedEventArgs e)
     {
-        RefreshPopup.IsOpen = !RefreshPopup.IsOpen;
+        PopupToggle.Toggle(RefreshPopup);
     }
 
     // The mini SCAN tile: drag it into the drawing, like on the first page

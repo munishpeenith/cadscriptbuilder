@@ -7,7 +7,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <AssemblyName>CADScriptBuilder</AssemblyName>
-    <Version>0.1.0</Version>
+    <Version>0.3.0</Version>
     <ApplicationIcon>csb.ico</ApplicationIcon>
   </PropertyGroup>
 
@@ -25,7 +25,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <None Include="..\..\lsp\07_scrape_layers_to_write.lsp" Link="csb_scan.lsp" CopyToOutputDirectory="PreserveNewest" />
+    <!-- The scan script is built into the .exe; the app writes it out to Documents on start -->
+    <EmbeddedResource Include="..\..\lsp\07_scrape_layers_to_write.lsp" LogicalName="csb_scan.lsp" />
   </ItemGroup>
 
 </Project>

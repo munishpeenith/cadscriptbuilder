@@ -20,6 +20,9 @@ public partial class MainWindow : FluentWindow
         ApplicationThemeManager.Apply(ApplicationTheme.Dark, WindowBackdropType.Mica, false);
         ApplicationAccentColorManager.Apply(Color.FromRgb(0x00, 0x78, 0xD4), ApplicationTheme.Dark);
 
+        // Write out a fresh copy of the scan script for the SCAN tiles to drag
+        ScanFile.Write();
+
         // Start pinned or not, as chosen in Settings
         SetPinned(Settings.Load().StartPinned);
 
@@ -45,7 +48,7 @@ public partial class MainWindow : FluentWindow
     // The ? in the title bar: open or close the instructions
     private void HelpButton_Click(object sender, RoutedEventArgs e)
     {
-        HelpPopup.IsOpen = !HelpPopup.IsOpen;
+        PopupToggle.Toggle(HelpPopup);
     }
 
     private void ShowScanPage()

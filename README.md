@@ -52,7 +52,8 @@ To build a standalone `.exe` to share (no .NET needed on the other PC):
 dotnet publish src/Gui -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:EnableCompressionInSingleFile=true -p:DebugType=none -o publish
 ```
 
-Keep `CADScriptBuilder.exe` and `csb_scan.lsp` together. The app is unsigned, so Windows shows
+The result is a single `CADScriptBuilder.exe`. The scan script is built into it, and the app writes
+a fresh copy to `Documents\CADScriptBuilder\csb_scan.lsp` each time it starts. The app is unsigned, so Windows shows
 *More info → Run anyway* the first time.
 
 ---
@@ -236,7 +237,7 @@ Because the plan is independent (section 4), it can be added later as a second w
 
 ### Scan and sync
 
-- `lsp/07_scrape_layers_to_write.lsp` (copied next to the app as `csb_scan.lsp`) writes the drawing
+- `lsp/07_scrape_layers_to_write.lsp` (built into the app, written out as `Documents\CADScriptBuilder\csb_scan.lsp`) writes the drawing
   name, then every layer, to `Documents\CADScriptBuilder\layers.txt`. Lines starting with `*` carry
   extra detail (layer names can't contain `*`): `*scan=3`, `*current=`, `*linetype=`, `*frozen=`,
   `*off=`, `*locked=`, `*noplot=`. Older scans still load; checks that need missing detail are skipped.

@@ -19,7 +19,7 @@ public partial class ScanPage : UserControl
     public event Action? BackClicked;
 
     // The scan script, copied next to the .exe by Gui.csproj
-    private readonly string scanScript = Path.Combine(AppContext.BaseDirectory, "csb_scan.lsp");
+    private readonly string scanScript = ScanFile.Path;
 
     // Where the scan script writes its results (the same path as inside the .lsp)
     private readonly string layersFile = Path.Combine(
@@ -58,7 +58,7 @@ public partial class ScanPage : UserControl
 
         if (!File.Exists(scanScript))
         {
-            ShowError($"Can't find {scanScript}. Try rebuilding the app.");
+            ShowError($"Can't find {scanScript}. Try restarting the app.");
             return;
         }
 
