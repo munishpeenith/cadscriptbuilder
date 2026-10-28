@@ -206,7 +206,22 @@
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
+
+            <!-- ⚙ Settings, bottom right -->
+            <ui:Button x:Name="SettingsButton"
+                       Grid.Column="2"
+                       Width="40"
+                       Height="40"
+                       Margin="12,0,0,0"
+                       Padding="0"
+                       VerticalAlignment="Center"
+                       Appearance="Transparent"
+                       Click="SettingsButton_Click"
+                       ToolTip="Settings">
+                <ui:SymbolIcon FontSize="20" Symbol="Settings24" />
+            </ui:Button>
 
             <ui:Button x:Name="GenerateButton"
                        Grid.Column="0"
@@ -246,6 +261,26 @@
                 </StackPanel>
             </Border>
         </Grid>
+        <!-- Settings: which blocks to show, plus advanced options. Opens upwards from the ⚙ -->
+        <Popup x:Name="SettingsPopup"
+               AllowsTransparency="True"
+               HorizontalOffset="-280"
+               Placement="Top"
+               PlacementTarget="{Binding ElementName=SettingsButton}"
+               StaysOpen="False">
+            <Border Width="320"
+                    Margin="0,0,0,6"
+                    Padding="18,14"
+                    Background="{DynamicResource FlyoutBackground}"
+                    BorderBrush="{DynamicResource FlyoutBorderBrush}"
+                    BorderThickness="1"
+                    CornerRadius="8">
+                <ScrollViewer MaxHeight="440" VerticalScrollBarVisibility="Auto">
+                    <StackPanel x:Name="SettingsPanel" Margin="0,0,10,0" />
+                </ScrollViewer>
+            </Border>
+        </Popup>
+
         <!-- Refresh: a mini SCAN tile to drag into the drawing -->
         <Popup x:Name="RefreshPopup"
                AllowsTransparency="True"

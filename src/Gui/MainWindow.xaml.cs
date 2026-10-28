@@ -20,6 +20,9 @@ public partial class MainWindow : FluentWindow
         ApplicationThemeManager.Apply(ApplicationTheme.Dark, WindowBackdropType.Mica, false);
         ApplicationAccentColorManager.Apply(Color.FromRgb(0x00, 0x78, 0xD4), ApplicationTheme.Dark);
 
+        // Start pinned or not, as chosen in Settings
+        SetPinned(Settings.Load().StartPinned);
+
         BuildHelp();
         ShowScanPage();
     }
@@ -27,7 +30,12 @@ public partial class MainWindow : FluentWindow
     // The pin in the title bar: keep this window floating above Civil 3D, or not
     private void PinButton_Click(object sender, RoutedEventArgs e)
     {
-        Topmost = !Topmost;
+        SetPinned(!Topmost);
+    }
+
+    private void SetPinned(bool pinned)
+    {
+        Topmost = pinned;
         PinIcon.Filled = Topmost;
         PinButton.ToolTip = Topmost
             ? "Unpin: stop keeping this window on top"
@@ -101,6 +109,10 @@ public partial class MainWindow : FluentWindow
             "Save keeps your steps as a plan. Open loads a plan onto any drawing.",
             "Changed the drawing by hand? Press ↻ (top right) and drag the mini SCAN tile in to refresh.",
             "Change (top right) switches to a different drawing. Your steps are kept and re-checked.");
+
+        AddHelpSection("Settings",
+            "⚙ (bottom right of the steps page) hides blocks you don't use.",
+            "Advanced: clear the steps by itself after a run, and whether the window starts pinned.");
 
         AddHelpSection("The window",
             "The pin keeps this window on top of Civil 3D. Click it to unpin.",

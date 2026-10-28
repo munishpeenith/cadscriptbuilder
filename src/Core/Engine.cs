@@ -72,6 +72,7 @@ public static class Engine
         var noPlot = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         string? current = null;
         int version = 1;
+        bool fromRun = false;
 
         // Lines starting with * are extra info (layer names can't contain *)
         foreach (var line in lines.Skip(1))
@@ -105,13 +106,21 @@ public static class Engine
             {
                 noPlot.Add(line["*noplot=".Length..]);
             }
+            else if (line == "*source=run")
+            {
+                fromRun = true;
+            }
+            else if (line.StartsWith('*'))
+            {
+                // Extra info from a newer version of the app: skip it
+            }
             else if (line != "")
             {
                 layers.Add(line);
             }
         }
 
-        return new Scan(lines[0], layers, current, frozen, linetypes, off, locked, noPlot, version);
+        return new Scan(lines[0], layers, current, frozen, linetypes, off, locked, noPlot, version, fromRun);
     }
 
     public static CheckResult Check(Plan plan, Scan scan)
@@ -128,7 +137,8 @@ public static class Engine
     }
 
     // A copy of the scan (same as lsp/07), run at the end of every script so the app
-    // re-syncs with the drawing as soon as the changes are made
+    // re-syncs with the drawing as soon as the changes are made. The extra *source=run
+    // line tells the app this scan came straight after a run.
     private const string RescanLisp = """
         (defun csb-rescan ( / path f lay name flags)
           (vl-mkdir (strcat (getvar "MYDOCUMENTSPREFIX") "\\CADScriptBuilder"))
@@ -138,6 +148,7 @@ public static class Engine
             (progn
               (write-line (getvar "DWGNAME") f)
               (write-line "*scan=3" f)
+              (write-line "*source=run" f)
               (write-line (strcat "*current=" (getvar "CLAYER")) f)
               (setq lay (tblnext "LTYPE" T))
               (while lay

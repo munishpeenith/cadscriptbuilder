@@ -171,6 +171,7 @@ public partial class ScanPage : UserControl
             "Select several layers at once, in the order you tick them",
             "Drag steps to reorder, Delete to remove, double-click to edit",
             "Save plans and reuse them on other drawings",
+            "Settings: hide blocks you don't use, clear steps after a run",
             "Drag-out script, straight into Civil 3D",
             "Stays on top of Civil 3D (pin), and snaps side by side",
             "Command line version that runs saved plans");

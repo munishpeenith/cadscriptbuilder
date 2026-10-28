@@ -23,6 +23,8 @@ blocks.
   - Drag steps to reorder, Delete to remove, double-click to edit, Clear all.
   - Stays in sync: every script rescans the drawing after it runs, and the ↻ button gives a mini
     SCAN tile for changes made by hand.
+  - ⚙ Settings (bottom right): hide blocks you don't use, clear steps after a run, start pinned.
+    Saved to `Documents\CADScriptBuilder\settings.json`.
   - Save plans and open them on other drawings; change drawing without losing your steps.
   - *Generate* makes a RUN tile you drag straight into Civil 3D.
   - Pin to keep it on top of Civil 3D; snaps side by side.

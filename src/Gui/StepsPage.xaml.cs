@@ -5,6 +5,7 @@ using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Threading;
 using Core;
+using ControlAppearance = Wpf.Ui.Controls.ControlAppearance;
 using InfoBarSeverity = Wpf.Ui.Controls.InfoBarSeverity;
 using SymbolRegular = Wpf.Ui.Controls.SymbolRegular;
 
@@ -121,6 +122,11 @@ public partial class StepsPage : UserControl
     // The scan script, next to the .exe (copied there by Gui.csproj)
     private static readonly string ScanScript = Path.Combine(AppContext.BaseDirectory, "csb_scan.lsp");
 
+    // The ⚙ choices, and the blocks they leave showing in the dropdown
+    private readonly Settings settings = Settings.Load();
+    private List<BlockChoice> shownBlocks = [];
+    private BlockChoice? tempShown;   // a hidden block shown just while editing one of its steps
+
     // Watches for new scans while this page is showing, so it re-syncs by itself
     private FileSystemWatcher? refreshWatcher;
     private readonly DispatcherTimer refreshTimer = new() { Interval = TimeSpan.FromMilliseconds(500) };
@@ -138,8 +144,7 @@ public partial class StepsPage : UserControl
 
         ShowDrawing();
 
-        BlockBox.ItemsSource = Blocks.Select(block => block.Name).ToList();
-        BlockBox.SelectedIndex = 0;
+        ShowBlocks();
         BlockBox.SelectionChanged += (sender, e) => UpdateBoxes();
         FirstBox.TextChanged += (sender, e) => CancelPending();
         PickerSearch.TextChanged += (sender, e) => BuildPickerList();
@@ -185,6 +190,110 @@ public partial class StepsPage : UserControl
     private void ChangeDrawing_Click(object sender, RoutedEventArgs e)
     {
         ChangeDrawingClicked?.Invoke();
+    }
+
+    // ---- Settings (the ⚙, bottom right) ----
+
+    // Fill the block dropdown with the blocks that aren't hidden, keeping the current pick if we can
+    private void ShowBlocks()
+    {
+        var picked = BlockBox.SelectedIndex >= 0 && BlockBox.SelectedIndex < shownBlocks.Count
+            ? shownBlocks[BlockBox.SelectedIndex]
+            : null;
+
+        shownBlocks = Blocks.Where(b => !settings.HiddenBlocks.Contains(b.Name) || b == tempShown).ToList();
+        if (shownBlocks.Count == 0)
+        {
+            shownBlocks = Blocks.ToList();
+        }
+
+        BlockBox.ItemsSource = shownBlocks.Select(b => b.Name).ToList();
+        BlockBox.SelectedIndex = picked is null ? 0 : Math.Max(shownBlocks.IndexOf(picked), 0);
+    }
+
+    private void SettingsButton_Click(object sender, RoutedEventArgs e)
+    {
+        SettingsPanel.Children.Clear();
+        BuildSettings();
+        SettingsPopup.IsOpen = !SettingsPopup.IsOpen;
+    }
+
+    // Built in code, like the help: one checkbox per block, then the advanced options.
+    // Every change is saved straight away.
+    private void BuildSettings()
+    {
+        AddSettingsText("Settings", 16, bold: true, top: 0);
+
+        AddSettingsText("Blocks", 13, bold: true, top: 12);
+        AddSettingsText("Untick the blocks you don't use to hide them from the list.", 12, bold: false, top: 0);
+
+        var boxes = new List<CheckBox>();
+        foreach (var block in Blocks)
+        {
+            var box = new CheckBox
+            {
+                Content = block.Name,
+                IsChecked = !settings.HiddenBlocks.Contains(block.Name),
+                Margin = new Thickness(0, 2, 0, 0)
+            };
+            box.Click += (sender, e) =>
+            {
+                // Always keep at least one block
+                if (box.IsChecked != true && boxes.Count(b => b.IsChecked == true) == 0)
+                {
+                    box.IsChecked = true;
+                    return;
+                }
+
+                settings.HiddenBlocks.Remove(block.Name);
+                if (box.IsChecked != true)
+                {
+                    settings.HiddenBlocks.Add(block.Name);
+                }
+                settings.Save();
+                ShowBlocks();
+            };
+            boxes.Add(box);
+            SettingsPanel.Children.Add(box);
+        }
+
+        AddSettingsText("Advanced", 13, bold: true, top: 16);
+        AddSettingsOption("Clear steps after a run",
+            "Once a script runs in Civil 3D, start a fresh list by itself. Off: Clear all lights up instead.",
+            settings.ClearAfterRun, on => settings.ClearAfterRun = on);
+        AddSettingsOption("Start pinned on top",
+            "Open the window on top of Civil 3D. Takes effect next time the app opens.",
+            settings.StartPinned, on => settings.StartPinned = on);
+    }
+
+    private void AddSettingsOption(string name, string detail, bool isOn, Action<bool> set)
+    {
+        var box = new CheckBox { Content = name, IsChecked = isOn, Margin = new Thickness(0, 6, 0, 0) };
+        box.Click += (sender, e) =>
+        {
+            set(box.IsChecked == true);
+            settings.Save();
+        };
+        SettingsPanel.Children.Add(box);
+
+        var text = AddSettingsText(detail, 12, bold: false, top: 0);
+        text.Margin = new Thickness(28, 0, 0, 0);
+    }
+
+    private TextBlock AddSettingsText(string text, double size, bool bold, double top)
+    {
+        var block = new TextBlock
+        {
+            Text = text,
+            FontSize = size,
+            FontWeight = bold ? FontWeights.SemiBold : FontWeights.Normal,
+            TextWrapping = TextWrapping.Wrap,
+            Margin = new Thickness(0, top, 0, 4)
+        };
+        block.SetResourceReference(TextBlock.ForegroundProperty,
+            bold ? "TextFillColorPrimaryBrush" : "TextFillColorSecondaryBrush");
+        SettingsPanel.Children.Add(block);
+        return block;
     }
 
     // ---- Refresh: re-sync with the drawing after it changes ----
@@ -259,6 +368,18 @@ public partial class StepsPage : UserControl
         }
 
         RefreshPopup.IsOpen = false;
+
+        // Straight after a run, with "Clear steps after a run" on in Settings: start fresh
+        if (fresh.FromRun && settings.ClearAfterRun && plan.Operations.Count > 0)
+        {
+            int ran = plan.Operations.Count;
+            plan.Operations.Clear();
+            UseScan(fresh);
+            SetStatus(InfoBarSeverity.Success, "Script ran",
+                $"{ran} {(ran == 1 ? "step" : "steps")} applied to {scan.Drawing} and cleared. Ready for the next one.");
+            return;
+        }
+
         UseScan(fresh);
 
         if (plan.Operations.Count == 0 || Status.Severity == InfoBarSeverity.Success)
@@ -268,17 +389,37 @@ public partial class StepsPage : UserControl
         }
         else
         {
-            SetStatus(InfoBarSeverity.Warning, "Drawing refreshed",
-                "Your steps were re-checked against the updated drawing. If your script just ran, " +
-                "the steps that already happened now show ✖. Press Clear all to start the next one.");
+            // Steps that can't work any more (usually because they just ran): light up Clear all
+            if (Status.Severity == InfoBarSeverity.Error)
+            {
+                ClearButton.Appearance = ControlAppearance.Primary;
+            }
+
+            if (fresh.FromRun)
+            {
+                SetStatus(InfoBarSeverity.Warning, "Script ran",
+                    "The steps that just happened now show ✖, because they're already done. " +
+                    "Press Clear all to start the next one.");
+            }
+            else
+            {
+                SetStatus(InfoBarSeverity.Warning, "Drawing refreshed",
+                    "Your steps were re-checked against the updated drawing. If your script just ran, " +
+                    "the steps that already happened now show ✖. Press Clear all to start the next one.");
+            }
         }
     }
 
-    private BlockChoice SelectedBlock => Blocks[BlockBox.SelectedIndex];
+    private BlockChoice SelectedBlock => shownBlocks[Math.Max(BlockBox.SelectedIndex, 0)];
 
     // Show one or two boxes, with the right hints, for the chosen block
     private void UpdateBoxes()
     {
+        if (BlockBox.SelectedIndex < 0)
+        {
+            return;   // only happens for a moment while the list is being refilled
+        }
+
         CancelPending();
         var block = SelectedBlock;
         bool twoBoxes = block.SecondHint is not null;
@@ -615,13 +756,20 @@ public partial class StepsPage : UserControl
 
         // Load the step into the boxes above; Add becomes Update
         var step = plan.Operations[i];
-        int blockIndex = Array.FindIndex(Blocks, b => !b.Pattern && b.Make("x", "y").GetType() == step.GetType());
-        if (blockIndex < 0)
+        var block = Blocks.FirstOrDefault(b => !b.Pattern && b.Make("x", "y").GetType() == step.GetType());
+        if (block is null)
         {
             return;
         }
 
-        BlockBox.SelectedIndex = blockIndex;
+        // Its block may be hidden in Settings: show it just while editing
+        if (!shownBlocks.Contains(block))
+        {
+            tempShown = block;
+            ShowBlocks();
+        }
+
+        BlockBox.SelectedIndex = shownBlocks.IndexOf(block);
         var (first, second) = ValuesOf(step);
         FirstBox.Text = first;
         SecondBox.Text = second;
@@ -652,6 +800,12 @@ public partial class StepsPage : UserControl
     {
         editingIndex = -1;
         AddButton.Content = "Add";
+
+        if (tempShown is not null)
+        {
+            tempShown = null;
+            ShowBlocks();
+        }
     }
 
     // Esc: stop editing, and close any dropdowns
@@ -835,6 +989,9 @@ public partial class StepsPage : UserControl
     // Runs after every add or remove, so the ticks are always up to date.
     private void RefreshSteps()
     {
+        // The steps changed, so Clear all goes back to normal
+        ClearButton.Appearance = ControlAppearance.Secondary;
+
         // The steps changed, so any script made earlier is out of date: remove it
         RunTile.Visibility = Visibility.Collapsed;
         if (File.Exists(runScript))
