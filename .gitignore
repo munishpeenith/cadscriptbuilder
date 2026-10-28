@@ -4,3 +4,4 @@ obj/
 out/
 src/layers.txt
 publish/*.zip
+versions/
