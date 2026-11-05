@@ -1,9 +1,9 @@
 using System.IO;
-using System.Reflection;
+using Core;
 
 namespace Gui;
 
-// The scan script lives inside the .exe (an embedded resource, like a file baked into a Python zipapp).
+// The scan script comes from Core (the same code every generated script runs at the end).
 // Each time the app starts, it writes a fresh copy to Documents\CADScriptBuilder\csb_scan.lsp,
 // and the SCAN tiles drag that copy. So the .exe works on its own, and the copy is never stale.
 public static class ScanFile
@@ -16,15 +16,8 @@ public static class ScanFile
     {
         try
         {
-            using var script = Assembly.GetExecutingAssembly().GetManifestResourceStream("csb_scan.lsp");
-            if (script is null)
-            {
-                return;
-            }
-
             Directory.CreateDirectory(System.IO.Path.GetDirectoryName(Path)!);
-            using var file = File.Create(Path);
-            script.CopyTo(file);
+            File.WriteAllText(Path, ScanLisp.Script);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {

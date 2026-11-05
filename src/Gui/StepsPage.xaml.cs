@@ -15,7 +15,7 @@ namespace Gui;
 public record StepRow(SymbolRegular Icon, string Text, Brush Color);
 
 // What a box suggests as you type
-public enum Suggest { Nothing, Layers, Linetypes, Lineweights }
+public enum Suggest { Nothing, Layers, Linetypes, Lineweights, OnOff }
 
 // One choice in the block dropdown: its name, the hints and suggestions for its boxes,
 // and how to build the block from what's typed. SecondHint is null for one-box blocks.
@@ -86,6 +86,19 @@ public partial class StepsPage : UserControl
         new("Plot off", "Layer", Suggest.Layers, null, Suggest.Nothing,
             (a, _) => new NoPlotLayer { Layer = a },
             Show: (d, l) => !d.KnowsOnOffLockPlot || !d.NoPlot.Contains(l)),
+
+        // Linetype scale
+        new("Set linetype scale", "Layer", Suggest.Layers, "Scale, e.g. 0.5", Suggest.Nothing,
+            (a, b) => new SetLayerLinetypeScale { Layer = a, Scale = b },
+            Show: (d, l) => !d.Locked.Contains(l) && d.CountOf(l) != 0),
+        new("Drawing linetype scale (LTSCALE)", "Scale, e.g. 1", Suggest.Nothing, null, Suggest.Nothing,
+            (a, _) => new SetLinetypeSetting { Setting = "LTSCALE", Value = a }),
+        new("New object linetype scale (CELTSCALE)", "Scale, e.g. 1", Suggest.Nothing, null, Suggest.Nothing,
+            (a, _) => new SetLinetypeSetting { Setting = "CELTSCALE", Value = a }),
+        new("Viewport linetype scaling (PSLTSCALE)", "On or Off", Suggest.OnOff, null, Suggest.Nothing,
+            (a, _) => new SetLinetypeSetting { Setting = "PSLTSCALE", Value = a }),
+        new("Model space linetype scaling (MSLTSCALE)", "On or Off", Suggest.OnOff, null, Suggest.Nothing,
+            (a, _) => new SetLinetypeSetting { Setting = "MSLTSCALE", Value = a }),
     ];
 
     // The drawing we synced with on page 1, and the plan being built
@@ -453,6 +466,7 @@ public partial class StepsPage : UserControl
                 .OrderBy(name => name, StringComparer.OrdinalIgnoreCase),
             Suggest.Linetypes => after.Linetypes.OrderBy(name => name, StringComparer.OrdinalIgnoreCase),
             Suggest.Lineweights => SetLayerLineweight.Allowed,
+            Suggest.OnOff => ["On", "Off"],
             _ => [],
         };
         return items.Cast<object>().ToList();
@@ -758,7 +772,7 @@ public partial class StepsPage : UserControl
 
         // Load the step into the boxes above; Add becomes Update
         var step = plan.Operations[i];
-        var block = Blocks.FirstOrDefault(b => !b.Pattern && b.Make("x", "y").GetType() == step.GetType());
+        var block = Blocks.FirstOrDefault(b => !b.Pattern && b.Make("x", "y").Kind() == step.Kind());
         if (block is null)
         {
             return;
@@ -794,6 +808,8 @@ public partial class StepsPage : UserControl
         SetLayerLineweight w => (w.Layer, w.Lineweight),
         SetLayerTransparency t => (t.Layer, t.Transparency),
         SetLayerDescription d => (d.Layer, d.Description),
+        SetLayerLinetypeScale s => (s.Layer, s.Scale),
+        SetLinetypeSetting s => (s.Value, ""),
         LayerSetting other => (other.Layer, ""),
         _ => ("", "")
     };
@@ -1077,7 +1093,7 @@ public partial class StepsPage : UserControl
         }
 
         Directory.CreateDirectory(Path.GetDirectoryName(runScript)!);
-        File.WriteAllText(runScript, Engine.BuildLisp(plan));
+        File.WriteAllText(runScript, Engine.BuildLisp(plan, scan));
 
         RunTile.Visibility = Visibility.Visible;
         SetStatus(InfoBarSeverity.Success, "Script ready",

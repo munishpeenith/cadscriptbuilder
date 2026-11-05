@@ -25,7 +25,7 @@ public class NewLayer : Operation
         }
         else
         {
-            drawing.Layers.Add(Layer);
+            drawing.AddLayer(Layer);
         }
 
         return result;

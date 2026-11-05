@@ -20,9 +20,10 @@ try
     var plan = Engine.ReadPlan(planPath);
 
     // Check the plan against the drawing's layers, if a scan file was given
+    Scan? scan = null;
     if (args.Length >= 3)
     {
-        var scan = Engine.ReadScan(args[2]);
+        scan = Engine.ReadScan(args[2]);
         var result = Engine.Check(plan, scan);
 
         if (result.HasProblems)
@@ -45,7 +46,7 @@ try
         Console.WriteLine($"Checked against {scan.Drawing}: OK");
     }
 
-    File.WriteAllText(outputPath, Engine.BuildLisp(plan));
+    File.WriteAllText(outputPath, Engine.BuildLisp(plan, scan));
     Console.WriteLine($"Wrote {outputPath}");
 }
 catch (InvalidDataException ex)

@@ -153,6 +153,11 @@ public partial class ScanPage : UserControl
             "Set descriptions",
             "Plot on and off");
 
+        AddSection("Linetypes", done: true,
+            "Set the linetype scale of every object on a layer",
+            "Drawing settings: LTSCALE, CELTSCALE, PSLTSCALE, MSLTSCALE",
+            "Save presets per drawing scale as plans");
+
         AddSection("Safety", done: true,
             "Every step checked against your drawing before anything is made",
             "Steps that can't work are held back (with Add anyway if you mean it)",

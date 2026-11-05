@@ -21,8 +21,23 @@ namespace Core;
 [JsonDerivedType(typeof(SetLayerLineweight), "setLayerLineweight")]
 [JsonDerivedType(typeof(SetLayerTransparency), "setLayerTransparency")]
 [JsonDerivedType(typeof(SetLayerDescription), "setLayerDescription")]
+[JsonDerivedType(typeof(SetLayerLinetypeScale), "setLayerLinetypeScale")]
+[JsonDerivedType(typeof(SetLinetypeSetting), "setLinetypeSetting")]
 public abstract class Operation
 {
+    // Which step this is in the script (set while building it). Steps that count what they changed
+    // keep the result in a LISP variable named after it, e.g. csb-r3, for the summary.
+    [JsonIgnore]
+    public int Step { get; set; }
+
+    public string ResultName() => $"csb-r{Step}";
+
+    // True for steps whose change only shows after a regen (linetype scales, text styles)
+    public virtual bool NeedsRegen() => false;
+
+    // Which block this step came from. Usually its type, but one type can serve several blocks.
+    public virtual string Kind() => GetType().Name;
+
     public abstract CheckResult Check(DrawingState drawing);
     public abstract string Describe();
     public abstract string ToLisp();

@@ -6,7 +6,7 @@ public class PurgeLayer : Operation
 
     public override string Describe() => $"Would purge layer {Layer} (only if empty)";
 
-    public override string ToLisp() => $"""(command "-PURGE" "LA" "{Layer}" "N")""";
+    public override string ToLisp() => $"""(command "-PURGE" "LA" {Lisp.Quote(Layer)} "N")""";
 
     // Purge only works on empty layers, so the summary checks whether the layer actually went.
     // (Skipped if a later step makes a layer with the same name, as the check would be fooled.)
@@ -39,6 +39,11 @@ public class PurgeLayer : Operation
         else if (drawing.IsCurrent(Layer))
         {
             result.Problem($"Can't purge {Layer}: it's the current layer");
+        }
+        else if (drawing.CountOf(Layer) is > 0)
+        {
+            // Purge skips layers that still have objects, so the layer stays
+            result.Note($"{Layer} has {drawing.CountOf(Layer)} objects on it, so purge will skip it");
         }
         else
         {

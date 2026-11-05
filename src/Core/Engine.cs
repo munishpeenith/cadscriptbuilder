@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text;
 using System.Text.Json;
 
@@ -23,8 +24,10 @@ public static class Engine
 
     public static void SavePlan(Plan plan, string path)
     {
-        File.WriteAllText(path, JsonSerializer.Serialize(plan, SaveOptions));
+        File.WriteAllText(path, PlanToJson(plan));
     }
+
+    public static string PlanToJson(Plan plan) => JsonSerializer.Serialize(plan, SaveOptions);
 
     public static Plan ReadPlan(string path)
     {
@@ -32,11 +35,16 @@ public static class Engine
         {
             throw new InvalidDataException($"Can't find the plan file {path}.");
         }
+        return ParsePlan(File.ReadAllText(path));
+    }
 
+    // A plan from JSON text (a saved file, or steps proposed by AI mode)
+    public static Plan ParsePlan(string json)
+    {
         Plan? plan;
         try
         {
-            plan = JsonSerializer.Deserialize<Plan>(File.ReadAllText(path), JsonOptions);
+            plan = JsonSerializer.Deserialize<Plan>(json, JsonOptions);
         }
         catch (Exception ex) when (ex is JsonException or NotSupportedException)
         {
@@ -58,18 +66,26 @@ public static class Engine
             throw new InvalidDataException($"Can't find the scan file {path}.");
         }
 
-        var lines = File.ReadAllLines(path);
-        if (lines.Length == 0)
+        var lines = Decode(File.ReadAllBytes(path))
+            .Split('\n')
+            .Select(line => line.TrimEnd('\r'))
+            .ToArray();
+        if (lines.Length == 0 || lines[0].Trim() == "")
         {
             throw new InvalidDataException("The scan file is empty.");
         }
 
-        var layers = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        var frozen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        var linetypes = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        var off = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        var locked = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        var noPlot = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var layers = Scan.NewSet();
+        var frozen = Scan.NewSet();
+        var linetypes = Scan.NewSet();
+        var off = Scan.NewSet();
+        var locked = Scan.NewSet();
+        var noPlot = Scan.NewSet();
+        var counts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        var styles = new Dictionary<string, TextStyleInfo>(StringComparer.OrdinalIgnoreCase);
+        var texts = new List<TextItem>();
+        double? ltScale = null, ceLtScale = null;
+        int? psLtScale = null, msLtScale = null;
         string? current = null;
         int version = 1;
         bool fromRun = false;
@@ -77,50 +93,104 @@ public static class Engine
         // Lines starting with * are extra info (layer names can't contain *)
         foreach (var line in lines.Skip(1))
         {
-            if (line.StartsWith("*scan="))
+            if (line == "")
             {
-                int.TryParse(line["*scan=".Length..], out version);
+                continue;
             }
-            else if (line.StartsWith("*current="))
-            {
-                current = line["*current=".Length..];
-                version = Math.Max(version, 2);
-            }
-            else if (line.StartsWith("*frozen="))
-            {
-                frozen.Add(line["*frozen=".Length..]);
-            }
-            else if (line.StartsWith("*linetype="))
-            {
-                linetypes.Add(line["*linetype=".Length..]);
-            }
-            else if (line.StartsWith("*off="))
-            {
-                off.Add(line["*off=".Length..]);
-            }
-            else if (line.StartsWith("*locked="))
-            {
-                locked.Add(line["*locked=".Length..]);
-            }
-            else if (line.StartsWith("*noplot="))
-            {
-                noPlot.Add(line["*noplot=".Length..]);
-            }
-            else if (line == "*source=run")
-            {
-                fromRun = true;
-            }
-            else if (line.StartsWith('*'))
-            {
-                // Extra info from a newer version of the app: skip it
-            }
-            else if (line != "")
+            if (!line.StartsWith('*'))
             {
                 layers.Add(line);
+                continue;
+            }
+
+            int eq = line.IndexOf('=');
+            if (eq < 0)
+            {
+                continue;
+            }
+            var key = line[1..eq];
+            var value = line[(eq + 1)..];
+
+            switch (key)
+            {
+                case "scan": int.TryParse(value, out version); break;
+                case "source": fromRun = value == "run"; break;
+                case "current": current = value; version = Math.Max(version, 2); break;
+                case "frozen": frozen.Add(value); break;
+                case "linetype": linetypes.Add(value); break;
+                case "off": off.Add(value); break;
+                case "locked": locked.Add(value); break;
+                case "noplot": noPlot.Add(value); break;
+                case "ltscale": ltScale = Number.Parse(value); break;
+                case "celtscale": ceLtScale = Number.Parse(value); break;
+                case "psltscale": psLtScale = int.TryParse(value, out var ps) ? ps : null; break;
+                case "msltscale": msLtScale = int.TryParse(value, out var ms) ? ms : null; break;
+                case "count":
+                {
+                    // count|layer name
+                    var parts = value.Split('|', 2);
+                    if (parts.Length == 2 && int.TryParse(parts[0], out var n))
+                    {
+                        counts[parts[1]] = n;
+                    }
+                    break;
+                }
+                case "textstyle":
+                {
+                    // height|font|style name
+                    var parts = value.Split('|', 3);
+                    if (parts.Length == 3)
+                    {
+                        styles[parts[2]] = new TextStyleInfo(parts[1], Number.Parse(parts[0]) ?? 0);
+                    }
+                    break;
+                }
+                case "text":
+                {
+                    // type|handle|length of layer name|layer name, then the text itself
+                    var parts = value.Split('|', 4);
+                    if (parts.Length == 4 && int.TryParse(parts[2], out var length) && length <= parts[3].Length)
+                    {
+                        texts.Add(new TextItem(parts[0], parts[1], parts[3][..length], parts[3][length..]));
+                    }
+                    break;
+                }
+                // Anything else is extra info from a newer version of the app: skip it
             }
         }
 
-        return new Scan(lines[0], layers, current, frozen, linetypes, off, locked, noPlot, version, fromRun);
+        return new Scan
+        {
+            Drawing = lines[0].Trim(),
+            Layers = layers,
+            Current = current,
+            Frozen = frozen,
+            Linetypes = linetypes,
+            Off = off,
+            Locked = locked,
+            NoPlot = noPlot,
+            Version = version,
+            FromRun = fromRun,
+            Counts = counts,
+            Linetype = new LinetypeSettings(ltScale, ceLtScale, psLtScale, msLtScale),
+            TextStyles = styles,
+            Texts = texts
+        };
+    }
+
+    // Scans are written as UTF-8 by newer AutoCAD, or the Windows code page by older ones
+    private static string Decode(byte[] bytes)
+    {
+        try
+        {
+            var text = new UTF8Encoding(false, throwOnInvalidBytes: true).GetString(bytes);
+            return text.TrimStart('﻿');
+        }
+        catch (DecoderFallbackException)
+        {
+            Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
+            return Encoding.GetEncoding(1252).GetString(bytes);
+        }
     }
 
     public static CheckResult Check(Plan plan, Scan scan)
@@ -136,43 +206,37 @@ public static class Engine
         return result;
     }
 
-    // A copy of the scan (same as lsp/07), run at the end of every script so the app
-    // re-syncs with the drawing as soon as the changes are made. The extra *source=run
-    // line tells the app this scan came straight after a run.
-    private const string RescanLisp = """
-        (defun csb-rescan ( / path f lay name flags)
-          (vl-mkdir (strcat (getvar "MYDOCUMENTSPREFIX") "\\CADScriptBuilder"))
-          (setq path (strcat (getvar "MYDOCUMENTSPREFIX") "\\CADScriptBuilder\\layers.txt"))
-          (setq f (open path "w"))
-          (if f
-            (progn
-              (write-line (getvar "DWGNAME") f)
-              (write-line "*scan=3" f)
-              (write-line "*source=run" f)
-              (write-line (strcat "*current=" (getvar "CLAYER")) f)
-              (setq lay (tblnext "LTYPE" T))
-              (while lay
-                (write-line (strcat "*linetype=" (cdr (assoc 2 lay))) f)
-                (setq lay (tblnext "LTYPE")))
-              (setq lay (tblnext "LAYER" T))
-              (while lay
-                (setq name (cdr (assoc 2 lay)) flags (cdr (assoc 70 lay)))
-                (write-line name f)
-                (if (= 1 (logand 1 flags)) (write-line (strcat "*frozen=" name) f))
-                (if (= 4 (logand 4 flags)) (write-line (strcat "*locked=" name) f))
-                (if (minusp (cdr (assoc 62 lay))) (write-line (strcat "*off=" name) f))
-                (if (equal (cdr (assoc 290 (entget (tblobjname "LAYER" name)))) 0)
-                  (write-line (strcat "*noplot=" name) f))
-                (setq lay (tblnext "LAYER")))
-              (close f)))
-          (princ))
-        """;
-
-    public static string BuildLisp(Plan plan)
+    // Steps that change text work out their exact edits from the scan, so the scan is needed
+    // whenever the plan has one. Without a scan, every other block still builds.
+    public static string BuildLisp(Plan plan, Scan? scan = null)
     {
+        if (scan is not null)
+        {
+            Check(plan, scan);   // lets each step prepare its edits against the drawing as it'll be
+        }
+
+        for (int i = 0; i < plan.Operations.Count; i++)
+        {
+            plan.Operations[i].Step = i + 1;
+        }
+
+        var results = string.Join(" ", plan.Operations.Select(op => op.ResultName()));
         var lisp = new StringBuilder();
-        lisp.AppendLine(RescanLisp);
-        lisp.AppendLine("(defun c:CSB_RUN ()");
+        lisp.AppendLine(";; Generated by CADScriptBuilder");
+        lisp.AppendLine(ScanLisp.Helpers);
+        lisp.AppendLine(LispHelpers.Code);
+        lisp.AppendLine(ScanLisp.Function);
+        lisp.AppendLine($"(defun c:CSB_RUN ( / *error* csb-undo {results})");
+
+        // If anything goes wrong part way, close the undo group so one U still undoes it all
+        lisp.AppendLine("""
+              (defun *error* (msg)
+                (if csb-undo (command-s "_.UNDO" "_END"))
+                (if (not (wcmatch (strcase msg) "*CANCEL*,*QUIT*,*EXIT*"))
+                  (princ (strcat "\nCADScriptBuilder stopped: " msg)))
+                (if csb-undo (princ "\nType U once to undo the part that ran."))
+                (princ))
+            """);
 
         foreach (var op in plan.Operations)
         {
@@ -183,13 +247,21 @@ public static class Engine
         lisp.AppendLine("""  (if (= (getkword "\nApply changes? [Yes/No] <No>: ") "Yes")""");
         lisp.AppendLine("""    (progn""");
         lisp.AppendLine("""      (command "_.UNDO" "_BEGIN")""");
+        lisp.AppendLine("""      (setq csb-undo T)""");
 
         foreach (var op in plan.Operations)
         {
             lisp.AppendLine($"      {op.ToLisp()}");
         }
 
+        // Linetype scales and text styles only show once the drawing regenerates
+        if (plan.Operations.Any(op => op.NeedsRegen()))
+        {
+            lisp.AppendLine("""      (command "_.REGENALL")""");
+        }
+
         lisp.AppendLine("""      (command "_.UNDO" "_END")""");
+        lisp.AppendLine("""      (setq csb-undo nil)""");
 
         // After running: a summary of what was done
         var changes = plan.Operations.Count == 1 ? "1 change" : $"{plan.Operations.Count} changes";
@@ -198,7 +270,7 @@ public static class Engine
         {
             lisp.AppendLine($"      {plan.Operations[i].SummaryLisp(plan.Operations.Skip(i + 1))}");
         }
-        lisp.AppendLine("""      (csb-rescan)""");
+        lisp.AppendLine("""      (csb-scan "run")""");
         lisp.AppendLine("""      (princ "\nType U once to undo all of it."))""");
         lisp.AppendLine("""    (princ "\nCancelled. Nothing changed."))""");
         lisp.AppendLine("""  (princ))""");

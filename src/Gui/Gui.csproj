@@ -24,9 +24,4 @@
     <ProjectReference Include="..\Core\Core.csproj" />
   </ItemGroup>
 
-  <ItemGroup>
-    <!-- The scan script is built into the .exe; the app writes it out to Documents on start -->
-    <EmbeddedResource Include="..\..\lsp\07_scrape_layers_to_write.lsp" LogicalName="csb_scan.lsp" />
-  </ItemGroup>
-
 </Project>

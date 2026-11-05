@@ -103,6 +103,12 @@ public partial class MainWindow : FluentWindow
             "The app then re-syncs with the drawing by itself.",
             "Type U once to undo the whole script.");
 
+        AddHelpSection("Linetype scale",
+            "Set linetype scale changes every object on a layer (layers don't hold a scale themselves). Pick several layers with ☑ Select.",
+            "LTSCALE, CELTSCALE, PSLTSCALE and MSLTSCALE have their own blocks, for the drawing-wide settings.",
+            "Save a set of these as a plan to reuse as a preset, e.g. one plan per drawing scale.",
+            "Objects on locked layers can't change, so unlock the layer first.");
+
         AddHelpSection("Editing steps",
             "Drag a step up or down to reorder it.",
             "Delete removes the selected step. Clear all removes every step.",

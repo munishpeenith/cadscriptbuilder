@@ -4,18 +4,21 @@ A tool that lets engineers build custom AutoCAD and Civil 3D automations from te
 dry run, a single undo and a log on every change. AI-assisted planning comes later; the engine comes
 first.
 
-*Last updated 27 October 2026.*
+*Last updated 5 November 2026.*
 
 ---
 
 ## Current status
 
-**Working now (tested in Civil 3D 2027):** a Windows app, a command line generator, and 17 layer
-blocks.
+**Working now (tested in Civil 3D 2027):** a Windows app, a command line generator, 17 layer
+blocks and linetype scale blocks.
 
 - **The app** (`src/Gui`, WPF with a Windows 11 look):
   - Drag the SCAN tile into a drawing; the app syncs with it and shows *Connected: drawing.dwg*.
   - Build steps from 17 layer blocks, plus *Rename by pattern* (find and replace across many layers).
+  - **Linetype scale:** set the linetype scale of every object on a layer (layers don't hold a scale
+    themselves), plus blocks for LTSCALE, CELTSCALE, PSLTSCALE and MSLTSCALE. Save a set as a plan to
+    reuse as a preset per drawing scale.
   - Dropdowns list only the layers that make sense for the block (Thaw shows frozen layers, and so on).
   - Select several layers at once; steps are added in the order you tick them.
   - Every step is checked against the drawing as it will be after the steps before it:
@@ -30,7 +33,8 @@ blocks.
   - Pin to keep it on top of Civil 3D; snaps side by side.
 - **Every generated script:** previews each change, asks `Apply changes? [Yes/No]` (No by default),
   bundles everything into one undo, then prints a summary of what was done, including any purge
-  that didn't happen because the layer still had objects on it.
+  that didn't happen and how many objects each step changed or skipped. If anything fails part way,
+  the undo group is still closed, so one U reverses what ran.
 - **The command line** (`src/Generator`) runs saved plans with the same checks.
 
 **Next:** AI mode, then a full Scratch-style block builder.
@@ -52,7 +56,7 @@ To build a standalone `.exe` to share (no .NET needed on the other PC):
 dotnet publish src/Gui -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:EnableCompressionInSingleFile=true -p:DebugType=none -o publish
 ```
 
-The result is a single `CADScriptBuilder.exe`. The scan script is built into it, and the app writes
+The result is a single `CADScriptBuilder.exe`. The scan script (`src/Core/ScanLisp.cs`) is built into it, and the app writes
 a fresh copy to `Documents\CADScriptBuilder\csb_scan.lsp` each time it starts. The app is unsigned, so Windows shows
 *More info → Run anyway* the first time.
 
@@ -76,7 +80,7 @@ software accepts.**
 
 ### Where it came from
 
-Scoped with Ayub Wayrah, a graduate civil engineer at AECOM, after asking what costs his team time.
+Scoped with a graduate civil engineer at AECOM, after asking what costs his team time.
 His answer: he has repeatedly had to make the same bulk changes across a drawing, highly specific to
 that drawing each time. On one occasion he found a script on GitHub that he could drag and drop
 straight into his Civil 3D drawing, and it worked. That moment is the product.
@@ -237,10 +241,17 @@ Because the plan is independent (section 4), it can be added later as a second w
 
 ### Scan and sync
 
-- `lsp/07_scrape_layers_to_write.lsp` (built into the app, written out as `Documents\CADScriptBuilder\csb_scan.lsp`) writes the drawing
-  name, then every layer, to `Documents\CADScriptBuilder\layers.txt`. Lines starting with `*` carry
-  extra detail (layer names can't contain `*`): `*scan=3`, `*current=`, `*linetype=`, `*frozen=`,
-  `*off=`, `*locked=`, `*noplot=`. Older scans still load; checks that need missing detail are skipped.
+- The scan lives in one place, `src/Core/ScanLisp.cs`. The SCAN tile runs it (written out as
+  `Documents\CADScriptBuilder\csb_scan.lsp`), and every generated script runs it again at the end.
+  It writes the drawing name, then every layer, to `Documents\CADScriptBuilder\layers.txt`. Lines
+  starting with `*` carry extra detail (layer names can't contain `*`):
+  - v3: `*current=`, `*linetype=`, `*frozen=`, `*off=`, `*locked=`, `*noplot=`
+  - v4: `*count=N|layer` (objects per layer), `*ltscale=`, `*celtscale=`, `*psltscale=`,
+    `*msltscale=`, `*textstyle=height|font|name`, and `*text=type|handle|n|layer...` for every TEXT,
+    MTEXT and MULTILEADER (n is the layer name's length, so names with `|` still parse).
+  - Written as UTF-8 where AutoCAD supports it, so symbols like ° survive; older files still load.
+- `lsp/07_scrape_layers_to_write.lsp` is the original hand-written scan (v3), kept as a learning step.
+  Older scans still load; checks that need missing detail are skipped.
 - The app watches that file and ticks green the moment a new scan lands.
 - Scans live outside the repo, so layer names from real drawings never reach GitHub.
 
@@ -254,7 +265,7 @@ Because the plan is independent (section 4), it can be added later as a second w
 - **Uniclass 2015 tables** download free from uniclass.thenbs.com. The NBS API is gated and not on the
   critical path.
 
-**Ayub's correction:** conventions differ **between projects**. Build a custom convention builder and
+**The engineer's correction:** conventions differ **between projects**. Build a custom convention builder and
 treat published schemes as presets.
 
 **Uniclass supplies valid target names, not mappings.** Deciding what a layer *is* is a judgement;
@@ -304,6 +315,7 @@ locally and holds no project data.
 3. **Second block** *(done)*: purge, chained with rename in one plan and one undo.
 4. **Sync** *(done)*: plans checked against the scan; nothing generated if they don't match.
 5. **App** *(done)*: scan page, steps page, 17 layer blocks, smart checks, save/open plans.
+5a. **Linetype scale** *(done)*: per layer and drawing-wide, with object counts in the scan.
 6. **Prompt mode (AI)** *(next)*.
 7. **Full Scratch-style block builder.**
 8. **COM Connect.** Smaller job than 6, so it can jump the queue for a quick win.
@@ -332,7 +344,7 @@ what it said it would.
 **Still open:**
 
 - How templates are stored, versioned and tested.
-- Which operations make the version 1 library. The question for Ayub: what changes has he actually
+- Which operations make the version 1 library. The question for the engineer: what changes has he actually
   made by hand this year?
 
 ---
@@ -341,9 +353,10 @@ what it said it would.
 
 ```
 README.md         this file
-lsp/              hand-written AutoLISP, numbered in build order (07 is the scan script)
+lsp/              hand-written AutoLISP, numbered in build order (the learning ladder)
 plans/            example plans (JSON)
-src/Core/         the engine: plans, scans, checks, blocks (Operations/), LISP building
+src/Core/         the engine: plans, scans, checks, blocks (Operations/), LISP building,
+                  ScanLisp.cs (the scan) and LispHelpers.cs (shared LISP functions)
 src/Generator/    command line: plan + scan in, .lsp out
 src/Gui/          the Windows app
 ```
@@ -361,7 +374,7 @@ src/Gui/          the Windows app
 - **Editor:** VS Code with Autodesk's AutoLISP extension and the C# Dev Kit.
 - **Verifying a script:** `DWGCOMPARE`; check Civil styles still resolve; check viewport overrides;
   save, close and reopen; rebuild the surface.
-- **Testers:** Munish, and Ayub. **Sample or sanitised drawings only, never live project files.**
+- **Testers:** Munish, and the engineer who scoped it. **Sample or sanitised drawings only, never live project files.**
 
 ---
 
@@ -398,6 +411,5 @@ src/Gui/          the Windows app
 
 ## Credit
 
-**Proposed by Munish Peenith.** Scoped in conversation with Ayub Wayrah, a graduate civil engineer at
-AECOM, who also tests it. Ayub is still clearing his involvement internally, so he is not named as a
-co-proposer on anything sent to AECOM.
+**Built by Munish Peenith**, scoped with and tested by a graduate civil engineer in AECOM's civil
+engineering team.
