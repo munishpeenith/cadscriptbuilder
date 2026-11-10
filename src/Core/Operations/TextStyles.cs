@@ -18,8 +18,8 @@ public class SetTextStyleFont : Operation
 
     public override string ToLisp() => $"(setq {ResultName()} (csb-style-font {Lisp.Quote(Style)} {Lisp.Quote(Font)}))";
 
-    public override string SummaryLisp(IEnumerable<Operation> later) =>
-        $"""(princ (if {ResultName()} "\n  - Text style {Lisp.Escape(Style)} now uses {Lisp.Escape(Font)}" "\n  - Text style {Lisp.Escape(Style)} NOT changed: AutoCAD couldn't use the font {Lisp.Escape(Font)}"))""";
+    public override string SummaryText(IEnumerable<Operation> later) =>
+        $"""(if {ResultName()} "\n  - Text style {Lisp.Escape(Style)} now uses {Lisp.Escape(Font)}" "\n  - Text style {Lisp.Escape(Style)} NOT changed: AutoCAD couldn't use the font {Lisp.Escape(Font)}")""";
 
     public override CheckResult Check(DrawingState drawing)
     {
@@ -44,48 +44,6 @@ public class SetTextStyleFont : Operation
     }
 }
 
-public class SetTextStyleHeight : Operation
-{
-    public string Style { get; set; } = "";
-    public string Height { get; set; } = "";
-
-    public override string Describe() => $"Would set the fixed height of text style {Style} to {Height} (used by new text)";
-
-    public override string Done() => $"Text style {Style} height set to {Height}";
-
-    public override bool NeedsRegen() => true;
-
-    public override string ToLisp() =>
-        $"(setq {ResultName()} (csb-style-height {Lisp.Quote(Style)} {Number.ToLisp(Number.Parse(Height) ?? 0)}))";
-
-    public override string SummaryLisp(IEnumerable<Operation> later) =>
-        $"""(princ (if {ResultName()} "\n  - {Lisp.Escape(Done())}" "\n  - Text style {Lisp.Escape(Style)} height NOT changed"))""";
-
-    public override CheckResult Check(DrawingState drawing)
-    {
-        var result = new CheckResult();
-        if (!TextStyleRules.CheckStyle(drawing, Style, "set the height of", result))
-        {
-            return result;
-        }
-
-        var value = Number.Parse(Height);
-        if (value is null || value < 0)
-        {
-            result.Problem($"Can't set the height of {Style} to {Height}: use 0 (set per text) or a number above 0");
-            return result;
-        }
-
-        var now = drawing.TextStyles[Style];
-        if (Math.Abs(now.Height - value.Value) < 1e-9)
-        {
-            result.Note($"{Style} already has height {Number.Show(value.Value)}, so this step changes nothing");
-        }
-        drawing.TextStyles[Style] = now with { Height = value.Value };
-        return result;
-    }
-}
-
 // Every TEXT, MTEXT and multileader on a layer gets the same height
 public class SetTextHeight : LayerSetting
 {
@@ -105,8 +63,8 @@ public class SetTextHeight : LayerSetting
                $"(function (lambda (o) (if (= (vla-get-objectname o) \"AcDbMLeader\") (vla-put-textheight o {h}) (vla-put-height o {h}))))))";
     }
 
-    public override string SummaryLisp(IEnumerable<Operation> later) =>
-        $"""(princ (strcat "\n  - Text height {Lisp.Escape(Height)} on {Lisp.Escape(Layer)}: " (csb-count {ResultName()} "texts")))""";
+    public override string SummaryText(IEnumerable<Operation> later) =>
+        $"""(strcat "\n  - Text height {Lisp.Escape(Height)} on {Lisp.Escape(Layer)}: " (csb-count {ResultName()} "texts"))""";
 
     protected override void CheckMore(DrawingState drawing, CheckResult result)
     {
@@ -139,8 +97,8 @@ public class SetTextStyleOnLayer : LayerSetting
                $"(function (lambda (o) (if (= (vla-get-objectname o) \"AcDbMLeader\") (vla-put-textstylename o {style}) (vla-put-stylename o {style}))))))";
     }
 
-    public override string SummaryLisp(IEnumerable<Operation> later) =>
-        $"""(princ (strcat "\n  - Text style {Lisp.Escape(Style)} on {Lisp.Escape(Layer)}: " (csb-count {ResultName()} "texts")))""";
+    public override string SummaryText(IEnumerable<Operation> later) =>
+        $"""(strcat "\n  - Text style {Lisp.Escape(Style)} on {Lisp.Escape(Layer)}: " (csb-count {ResultName()} "texts"))""";
 
     protected override void CheckMore(DrawingState drawing, CheckResult result)
     {
