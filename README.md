@@ -11,7 +11,7 @@ first.
 ## Current status
 
 **Working now (tested in Civil 3D 2027):** a Windows app, a command line generator, 17 layer
-blocks and linetype scale blocks.
+blocks, plus linetype scale and font/text blocks.
 
 - **The app** (`src/Gui`, WPF with a Windows 11 look):
   - Drag the SCAN tile into a drawing; the app syncs with it and shows *Connected: drawing.dwg*.
@@ -19,6 +19,9 @@ blocks and linetype scale blocks.
   - **Linetype scale:** set the linetype scale of every object on a layer (layers don't hold a scale
     themselves), plus blocks for LTSCALE, CELTSCALE, PSLTSCALE and MSLTSCALE. Save a set as a plan to
     reuse as a preset per drawing scale.
+  - **Fonts and text:** change a text style's font (every text and Civil 3D label using the style
+    follows), set a style's height, set the height of all text on a layer, or move a layer's text
+    onto one style.
   - Dropdowns list only the layers that make sense for the block (Thaw shows frozen layers, and so on).
   - Select several layers at once; steps are added in the order you tick them.
   - Every step is checked against the drawing as it will be after the steps before it:
@@ -316,6 +319,7 @@ locally and holds no project data.
 4. **Sync** *(done)*: plans checked against the scan; nothing generated if they don't match.
 5. **App** *(done)*: scan page, steps page, 17 layer blocks, smart checks, save/open plans.
 5a. **Linetype scale** *(done)*: per layer and drawing-wide, with object counts in the scan.
+5b. **Fonts and text** *(done)*: text style fonts and heights, text height and style per layer.
 6. **Prompt mode (AI)** *(next)*.
 7. **Full Scratch-style block builder.**
 8. **COM Connect.** Smaller job than 6, so it can jump the queue for a quick win.

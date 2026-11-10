@@ -109,6 +109,13 @@ public partial class MainWindow : FluentWindow
             "Save a set of these as a plan to reuse as a preset, e.g. one plan per drawing scale.",
             "Objects on locked layers can't change, so unlock the layer first.");
 
+        AddHelpSection("Fonts and text",
+            "Change text style font swaps the font for every text, and every Civil 3D label, that uses the style.",
+            "Use a font name like Arial, or a font file like romans.shx.",
+            "Set text height changes all text on a layer. A style's own height only applies to new text.",
+            "Set text style on layer moves all text on a layer onto one style.",
+            "Text with a font typed into it by hand (an MText override) keeps that font.");
+
         AddHelpSection("Editing steps",
             "Drag a step up or down to reorder it.",
             "Delete removes the selected step. Clear all removes every step.",

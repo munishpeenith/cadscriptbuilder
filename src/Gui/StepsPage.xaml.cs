@@ -15,7 +15,7 @@ namespace Gui;
 public record StepRow(SymbolRegular Icon, string Text, Brush Color);
 
 // What a box suggests as you type
-public enum Suggest { Nothing, Layers, Linetypes, Lineweights, OnOff }
+public enum Suggest { Nothing, Layers, Linetypes, Lineweights, OnOff, TextStyles, Fonts }
 
 // One choice in the block dropdown: its name, the hints and suggestions for its boxes,
 // and how to build the block from what's typed. SecondHint is null for one-box blocks.
@@ -99,6 +99,18 @@ public partial class StepsPage : UserControl
             (a, _) => new SetLinetypeSetting { Setting = "PSLTSCALE", Value = a }),
         new("Model space linetype scaling (MSLTSCALE)", "On or Off", Suggest.OnOff, null, Suggest.Nothing,
             (a, _) => new SetLinetypeSetting { Setting = "MSLTSCALE", Value = a }),
+
+        // Fonts and text (Civil 3D labels use text styles, so their fonts follow too)
+        new("Change text style font", "Text style", Suggest.TextStyles, "Font, e.g. Arial or romans.shx", Suggest.Fonts,
+            (a, b) => new SetTextStyleFont { Style = a, Font = b }),
+        new("Set text style height", "Text style", Suggest.TextStyles, "Height (0 = set per text)", Suggest.Nothing,
+            (a, b) => new SetTextStyleHeight { Style = a, Height = b }),
+        new("Set text height", "Layer", Suggest.Layers, "Height, e.g. 2.5", Suggest.Nothing,
+            (a, b) => new SetTextHeight { Layer = a, Height = b },
+            Show: (d, l) => !d.Locked.Contains(l) && (!d.KnowsContents || d.TextsOn(l).Any())),
+        new("Set text style on layer", "Layer", Suggest.Layers, "Text style", Suggest.TextStyles,
+            (a, b) => new SetTextStyleOnLayer { Layer = a, Style = b },
+            Show: (d, l) => !d.Locked.Contains(l) && (!d.KnowsContents || d.TextsOn(l).Any())),
     ];
 
     // The drawing we synced with on page 1, and the plan being built
@@ -445,7 +457,8 @@ public partial class StepsPage : UserControl
         Grid.SetColumnSpan(FirstArea, twoBoxes ? 1 : 2);
 
         // Picking several only makes sense for blocks that act on existing layers one at a time
-        SelectButton.IsEnabled = block.FirstSuggest == Suggest.Layers && block.Name != "Rename layer" && !block.Pattern;
+        SelectButton.IsEnabled = (block.FirstSuggest == Suggest.Layers || block.FirstSuggest == Suggest.TextStyles)
+            && block.Name != "Rename layer" && !block.Pattern;
 
         UpdateSuggestions();
     }
@@ -467,6 +480,12 @@ public partial class StepsPage : UserControl
             Suggest.Linetypes => after.Linetypes.OrderBy(name => name, StringComparer.OrdinalIgnoreCase),
             Suggest.Lineweights => SetLayerLineweight.Allowed,
             Suggest.OnOff => ["On", "Off"],
+            Suggest.TextStyles => after.TextStyles.Keys.OrderBy(name => name, StringComparer.OrdinalIgnoreCase),
+            Suggest.Fonts => after.TextStyles.Values.Select(s => s.Font)
+                .Concat(TextStyleRules.CommonFonts)
+                .Where(font => font != "")
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .OrderBy(font => font, StringComparer.OrdinalIgnoreCase),
             _ => [],
         };
         return items.Cast<object>().ToList();
@@ -810,6 +829,10 @@ public partial class StepsPage : UserControl
         SetLayerDescription d => (d.Layer, d.Description),
         SetLayerLinetypeScale s => (s.Layer, s.Scale),
         SetLinetypeSetting s => (s.Value, ""),
+        SetTextStyleFont f => (f.Style, f.Font),
+        SetTextStyleHeight h => (h.Style, h.Height),
+        SetTextHeight h => (h.Layer, h.Height),
+        SetTextStyleOnLayer s => (s.Layer, s.Style),
         LayerSetting other => (other.Layer, ""),
         _ => ("", "")
     };

@@ -158,6 +158,12 @@ public partial class ScanPage : UserControl
             "Drawing settings: LTSCALE, CELTSCALE, PSLTSCALE, MSLTSCALE",
             "Save presets per drawing scale as plans");
 
+        AddSection("Fonts and text", done: true,
+            "Change a text style's font (labels using the style follow)",
+            "Set a text style's height",
+            "Set the height of all text on a layer",
+            "Move all text on a layer onto one style");
+
         AddSection("Safety", done: true,
             "Every step checked against your drawing before anything is made",
             "Steps that can't work are held back (with Add anyway if you mean it)",
