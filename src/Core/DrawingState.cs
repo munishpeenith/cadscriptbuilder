@@ -69,6 +69,10 @@ public class DrawingState
     public int? CountOf(string layer) =>
         KnowsContents ? Counts.GetValueOrDefault(layer) : null;
 
+    // The text on a layer (TEXT, MTEXT and multileaders)
+    public IEnumerable<TextItem> TextsOn(string layer) =>
+        Texts.Where(t => t.Layer.Equals(layer, StringComparison.OrdinalIgnoreCase));
+
     public void AddLayer(string name)
     {
         Layers.Add(name);

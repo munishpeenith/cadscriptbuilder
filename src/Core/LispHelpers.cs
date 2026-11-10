@@ -21,6 +21,28 @@ public static class LispHelpers
                 (setq n (1+ n)))
               (setq i (1+ i))))
           (list n bad))
+        ;; A text style by name, or nil
+        (defun csb-style (name / st)
+          (setq st (vl-catch-all-apply 'vla-item
+                     (list (vla-get-textstyles (vla-get-activedocument (vlax-get-acad-object))) name)))
+          (if (vl-catch-all-error-p st) nil st))
+        ;; Change a text style's font: a font file (romans.shx, arial.ttf) or a font name (Arial).
+        ;; Returns T if AutoCAD accepted it.
+        (defun csb-style-font (name font / st)
+          (setq st (csb-style name))
+          (and st
+               (not (vl-catch-all-error-p
+                      (vl-catch-all-apply
+                        (if (wcmatch (strcase font) "*.SHX,*.TTF,*.TTC,*.OTF")
+                          (function (lambda () (vla-put-fontfile st font)))
+                          (function (lambda () (vla-setfont st font :vlax-false :vlax-false 0 34))))
+                        nil)))))
+        ;; Set a text style's fixed height (0 = each text sets its own). Returns T if it worked.
+        (defun csb-style-height (name h / st)
+          (setq st (csb-style name))
+          (and st
+               (not (vl-catch-all-error-p
+                      (vl-catch-all-apply (function (lambda () (vla-put-height st h))) nil)))))
         ;; "12 objects" or "12 objects (3 skipped)" for the summary
         (defun csb-count (r what)
           (strcat (itoa (car r)) " " what

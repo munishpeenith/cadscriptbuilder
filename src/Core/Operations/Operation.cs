@@ -23,6 +23,10 @@ namespace Core;
 [JsonDerivedType(typeof(SetLayerDescription), "setLayerDescription")]
 [JsonDerivedType(typeof(SetLayerLinetypeScale), "setLayerLinetypeScale")]
 [JsonDerivedType(typeof(SetLinetypeSetting), "setLinetypeSetting")]
+[JsonDerivedType(typeof(SetTextStyleFont), "setTextStyleFont")]
+[JsonDerivedType(typeof(SetTextStyleHeight), "setTextStyleHeight")]
+[JsonDerivedType(typeof(SetTextHeight), "setTextHeight")]
+[JsonDerivedType(typeof(SetTextStyleOnLayer), "setTextStyleOnLayer")]
 public abstract class Operation
 {
     // Which step this is in the script (set while building it). Steps that count what they changed
