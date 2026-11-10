@@ -161,20 +161,7 @@ public partial class ScanPage : UserControl
         AddSection("Fonts and text", done: true,
             "Change a text style's font (labels using the style follow)",
             "Set the height of all text on a layer",
-            "Move all text on a layer onto one style",
-            "Find and replace words in all text, keeping formatting",
-            "Make all text on a layer capitals");
-
-        AddSection("Standards", done: true,
-            "Layer naming check: presets or your own pattern",
-            "Offline British English spelling check of every text",
-            "One-click fixes, added as ordinary steps");
-
-        AddSection("AI mode (optional, off by default)", done: true,
-            "Describe what you want in plain English",
-            "The AI proposes steps; the same checks decide whether they run",
-            "Asks Yes/No before connecting; never sends the drawing or its text",
-            "History of every request and what was proposed");
+            "Move all text on a layer onto one style");
 
         AddSection("Safety", done: true,
             "Every step checked against your drawing before anything is made",
@@ -190,7 +177,6 @@ public partial class ScanPage : UserControl
             "Re-syncs with the drawing by itself after every run",
             "Refresh button for changes made by hand",
             "Change drawing without losing your steps",
-            "History panel: sync status, and what every run actually changed",
             "Dropdowns that only show layers that make sense for the block",
             "Select several layers at once, in the order you tick them",
             "Drag steps to reorder, Delete to remove, double-click to edit",
@@ -201,7 +187,9 @@ public partial class ScanPage : UserControl
             "Command line version that runs saved plans");
 
         AddSection("Coming soon", done: false,
+            "AI mode: describe what you want in plain English",
             "Drag-and-drop block builder",
+            "Standards check (Uniclass, house and client naming)",
             "Civil 3D styles and label styles",
             "Merge and delete layers",
             "Drawing cleanup: purge, audit, xrefs",

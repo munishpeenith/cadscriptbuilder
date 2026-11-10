@@ -11,7 +11,7 @@ first.
 ## Current status
 
 **Working now (tested in Civil 3D 2027):** a Windows app, a command line generator, 17 layer
-blocks, plus linetype scale, font/text and text-editing blocks, a standards check, and an optional AI mode.
+blocks, plus linetype scale and font/text blocks.
 
 - **The app** (`src/Gui`, WPF with a Windows 11 look):
   - Drag the SCAN tile into a drawing; the app syncs with it and shows *Connected: drawing.dwg*.
@@ -22,28 +22,6 @@ blocks, plus linetype scale, font/text and text-editing blocks, a standards chec
   - **Fonts and text:** change a text style's font (every text and Civil 3D label using the style
     follows), set the height of all text on a layer, or move a layer's text
     onto one style.
-  - **Changing text:** find and replace words across all TEXT, MTEXT and multileaders, or make a
-    layer's text capitals. Formatting codes are never touched. The edits are worked out from the scan
-    and applied by handle, only if the text still says what the scan saw, so anything edited by hand
-    since is left alone and reported as skipped.
-  - **Standards check** (shield button): layer names against a naming standard (presets: capitals with
-    no spaces, Discipline-Element, AEC (UK) with Uniclass 2015, or a custom pattern) and an offline
-    British English spelling check of every text. Each finding offers *Fix*, which adds an ordinary
-    step (a rename, or a whole-word replace), and spelling offers *Ignore*. Word list: SCOWL
-    (`src/Core/Standards/words-en-gb-LICENSE.txt`).
-  - **AI mode** (optional, off by default): turn it on in Settings, add an Anthropic API key (saved
-    encrypted for the Windows user, or taken from `ANTHROPIC_API_KEY`), then ✨ *Ask AI* → *Connect*,
-    which asks Yes/No before anything is sent. Describe the change in plain English; the model proposes
-    steps from the same block library as data (`src/Core/Ai/AiPlanner.cs`), never LISP. Proposed steps
-    go through the same checks, are held back if they can't work, and are previewed in Civil 3D.
-    Sent: the request, layer names and states, linetypes, text style names and linetype settings.
-    Never sent: the drawing, its geometry, or the words in its text. Every request is logged to
-    `Documents\CADScriptBuilder\ai-history.jsonl`.
-  - **History panel** (clock button, top right): a collapsible side panel showing whether the app is
-    synced with the drawing (*Synced*, *Script waiting to run*, *Not connected*) and a timeline of
-    scans, scripts made, runs, cancels, plans and AI requests. Each script saves its summary to
-    `Documents\CADScriptBuilder\last-run.txt` (tagged with a run id), so a run's entry lists what
-    actually happened in Civil 3D, including anything skipped or refused. Kept in `history.jsonl`.
   - Dropdowns list only the layers that make sense for the block (Thaw shows frozen layers, and so on).
   - Select several layers at once; steps are added in the order you tick them.
   - Every step is checked against the drawing as it will be after the steps before it:
@@ -62,8 +40,7 @@ blocks, plus linetype scale, font/text and text-editing blocks, a standards chec
   the undo group is still closed, so one U reverses what ran.
 - **The command line** (`src/Generator`) runs saved plans with the same checks.
 
-**Next:** a full Scratch-style block builder; Civil 3D label styles through a plugin (v2), with an
-AI on/off switch for IT.
+**Next:** AI mode, then a full Scratch-style block builder.
 
 ---
 
@@ -272,7 +249,7 @@ Because the plan is independent (section 4), it can be added later as a second w
   It writes the drawing name, then every layer, to `Documents\CADScriptBuilder\layers.txt`. Lines
   starting with `*` carry extra detail (layer names can't contain `*`):
   - v3: `*current=`, `*linetype=`, `*frozen=`, `*off=`, `*locked=`, `*noplot=`
-  - v4: `*count=N|layer` (objects per layer), `*layerlinetype=n|linetype layer`, `*ltscale=`, `*celtscale=`, `*psltscale=`,
+  - v4: `*count=N|layer` (objects per layer), `*ltscale=`, `*celtscale=`, `*psltscale=`,
     `*msltscale=`, `*textstyle=height|font|name`, and `*text=type|handle|n|layer...` for every TEXT,
     MTEXT and MULTILEADER (n is the layer name's length, so names with `|` still parse).
   - Written as UTF-8 where AutoCAD supports it, so symbols like ° survive; older files still load.
@@ -343,9 +320,7 @@ locally and holds no project data.
 5. **App** *(done)*: scan page, steps page, 17 layer blocks, smart checks, save/open plans.
 5a. **Linetype scale** *(done)*: per layer and drawing-wide, with object counts in the scan.
 5b. **Fonts and text** *(done)*: text style fonts (labels follow), text height and style per layer.
-5c. **Changing text** *(done)*: find and replace, capitals, MText-code aware (`src/Core/MText.cs`).
-5d. **Standards check** *(done)*: layer naming and spelling, with fixes as steps (`src/Core/Standards/`).
-6. **Prompt mode (AI)** *(done)*: optional, behind a Connect gate; the model proposes plans, the engine checks them.
+6. **Prompt mode (AI)** *(next)*.
 7. **Full Scratch-style block builder.**
 8. **COM Connect.** Smaller job than 6, so it can jump the queue for a quick win.
 

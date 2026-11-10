@@ -37,29 +37,6 @@ public static class LispHelpers
                           (function (lambda () (vla-put-fontfile st font)))
                           (function (lambda () (vla-setfont st font :vlax-false :vlax-false 0 34))))
                         nil)))))
-        ;; Change texts by handle: each edit is (handle now after). A text is only changed if it
-        ;; still says "now", so anything edited by hand since the scan is left alone (skipped).
-        (defun csb-settexts (edits / n bad e obj)
-          (setq n 0 bad 0)
-          (foreach ed edits
-            (setq e (handent (car ed)))
-            (if (and e
-                     (entget e)
-                     (setq obj (vlax-ename->vla-object e))
-                     (equal (vl-catch-all-apply 'vla-get-textstring (list obj)) (cadr ed))
-                     (not (vl-catch-all-error-p
-                            (vl-catch-all-apply 'vla-put-textstring (list obj (caddr ed))))))
-              (setq n (1+ n))
-              (setq bad (1+ bad))))
-          (list n bad))
-        ;; Documents\CADScriptBuilder\last-run.txt, where the summary is saved for the app's history
-        (defun csb-open-log ( / dir path f)
-          (setq dir (strcat (getvar "MYDOCUMENTSPREFIX") "\\CADScriptBuilder"))
-          (vl-mkdir dir)
-          (setq path (strcat dir "\\last-run.txt"))
-          (setq f (vl-catch-all-apply 'open (list path "w" "utf8")))
-          (if (or (null f) (vl-catch-all-error-p f)) (setq f (open path "w")))
-          f)
         ;; "12 objects" or "12 objects (3 skipped)" for the summary
         (defun csb-count (r what)
           (strcat (itoa (car r)) " " what

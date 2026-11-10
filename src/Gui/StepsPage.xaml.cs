@@ -1,7 +1,4 @@
 using System.IO;
-using System.Net.Http;
-using System.Text;
-using System.Text.Json.Nodes;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -93,7 +90,7 @@ public partial class StepsPage : UserControl
         // Linetype scale
         new("Set linetype scale", "Layer", Suggest.Layers, "Scale, e.g. 0.5", Suggest.Nothing,
             (a, b) => new SetLayerLinetypeScale { Layer = a, Scale = b },
-            Show: (d, l) => !d.Locked.Contains(l) && d.CountOf(l) != 0 && d.IsPatterned(l) != false),
+            Show: (d, l) => !d.Locked.Contains(l) && d.CountOf(l) != 0),
         new("Drawing linetype scale (LTSCALE)", "Scale, e.g. 1", Suggest.Nothing, null, Suggest.Nothing,
             (a, _) => new SetLinetypeSetting { Setting = "LTSCALE", Value = a }),
         new("New object linetype scale (CELTSCALE)", "Scale, e.g. 1", Suggest.Nothing, null, Suggest.Nothing,
@@ -111,13 +108,6 @@ public partial class StepsPage : UserControl
             Show: (d, l) => !d.Locked.Contains(l) && (!d.KnowsContents || d.TextsOn(l).Any())),
         new("Set text style on layer", "Layer", Suggest.Layers, "Text style", Suggest.TextStyles,
             (a, b) => new SetTextStyleOnLayer { Layer = a, Style = b },
-            Show: (d, l) => !d.Locked.Contains(l) && (!d.KnowsContents || d.TextsOn(l).Any())),
-
-        // Changing the words in the drawing's text
-        new("Replace text", "Find (exact capitals), e.g. EXISTNG", Suggest.Nothing, "Replace with, e.g. EXISTING", Suggest.Nothing,
-            (a, b) => new ReplaceText { Find = a, Replace = b }),
-        new("Make text capitals", "Layer", Suggest.Layers, null, Suggest.Nothing,
-            (a, _) => new UpperCaseText { Layer = a },
             Show: (d, l) => !d.Locked.Contains(l) && (!d.KnowsContents || d.TextsOn(l).Any())),
     ];
 
@@ -160,17 +150,6 @@ public partial class StepsPage : UserControl
     private List<BlockChoice> shownBlocks = [];
     private BlockChoice? tempShown;   // a hidden block shown just while editing one of its steps
 
-    // What a script saves after running (its summary), read back for the history panel
-    private static readonly string LastRunFile = Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
-        "CADScriptBuilder", "last-run.txt");
-
-    // The script made most recently: its tag, and its steps (in case the run's summary can't be read)
-    private string? lastRunId;
-    private List<string> lastRunSteps = [];
-    private string? handledRunId;
-    private readonly DispatcherTimer runLogTimer = new() { Interval = TimeSpan.FromMilliseconds(400) };
-
     // Watches for new scans while this page is showing, so it re-syncs by itself
     private FileSystemWatcher? refreshWatcher;
     private readonly DispatcherTimer refreshTimer = new() { Interval = TimeSpan.FromMilliseconds(500) };
@@ -189,7 +168,6 @@ public partial class StepsPage : UserControl
         ShowDrawing();
 
         ShowBlocks();
-        UpdateAiButton();
         BlockBox.SelectionChanged += (sender, e) => UpdateBoxes();
         FirstBox.TextChanged += (sender, e) => CancelPending();
         PickerSearch.TextChanged += (sender, e) => BuildPickerList();
@@ -199,7 +177,6 @@ public partial class StepsPage : UserControl
         RefreshSteps();
 
         refreshTimer.Tick += (sender, e) => RefreshFromScan();
-        runLogTimer.Tick += (sender, e) => CheckRunLog();
 
         // Only watch for new scans while this page is on screen
         Loaded += (sender, e) => StartWatching();
@@ -312,104 +289,6 @@ public partial class StepsPage : UserControl
         AddSettingsOption("Start pinned on top",
             "Open the window on top of Civil 3D. Takes effect next time the app opens.",
             settings.StartPinned, on => settings.StartPinned = on);
-
-        AddSettingsText("Standards", 13, bold: true, top: 16);
-        AddSettingsText("Layer naming standard for the standards check:", 12, bold: false, top: 0);
-
-        var names = NamingStandard.Presets.Select(p => $"{p.Name} (e.g. {p.Example})").Append("Custom pattern").ToList();
-        var standards = new ComboBox { ItemsSource = names, Margin = new Thickness(0, 2, 0, 4) };
-        int chosen = Array.FindIndex(NamingStandard.Presets, p => p.Name == settings.NamingStandard);
-        standards.SelectedIndex = settings.NamingStandard == "Custom pattern" ? names.Count - 1 : Math.Max(chosen, 0);
-        SettingsPanel.Children.Add(standards);
-
-        var pattern = new TextBox
-        {
-            Text = settings.CustomPattern,
-            Margin = new Thickness(0, 2, 0, 2),
-            ToolTip = "A regular expression every layer name must match, e.g. ^[A-Z]-[A-Z0-9-]+$"
-        };
-        var patternNote = AddSettingsText("", 12, bold: false, top: 0);
-        SettingsPanel.Children.Remove(patternNote);
-        SettingsPanel.Children.Add(pattern);
-        SettingsPanel.Children.Add(patternNote);
-
-        void ShowPattern()
-        {
-            bool custom = standards.SelectedIndex == names.Count - 1;
-            pattern.Visibility = custom ? Visibility.Visible : Visibility.Collapsed;
-            patternNote.Visibility = custom ? Visibility.Visible : Visibility.Collapsed;
-            patternNote.Text = NamingStandard.IsValidPattern(pattern.Text)
-                ? "A regular expression every layer name must match."
-                : "That pattern isn't valid yet, so names aren't checked against it.";
-        }
-
-        standards.SelectionChanged += (sender, e) =>
-        {
-            settings.NamingStandard = standards.SelectedIndex == names.Count - 1
-                ? "Custom pattern"
-                : NamingStandard.Presets[Math.Max(standards.SelectedIndex, 0)].Name;
-            settings.Save();
-            ShowPattern();
-        };
-        pattern.TextChanged += (sender, e) =>
-        {
-            settings.CustomPattern = pattern.Text;
-            settings.Save();
-            ShowPattern();
-        };
-        ShowPattern();
-
-        AddSettingsText("AI mode", 13, bold: true, top: 16);
-        AddSettingsOption("Allow AI mode",
-            "Shows the ✨ Ask AI button. It only connects when you press Connect. Your request and this drawing's " +
-            "layer names, linetypes and text style names are sent to Anthropic; never the drawing, its geometry or its text.",
-            settings.AiEnabled, on => { settings.AiEnabled = on; UpdateAiButton(); });
-
-        if (Settings.KeyFromEnvironment)
-        {
-            AddSettingsText("API key: using ANTHROPIC_API_KEY from your environment.", 12, bold: false, top: 4);
-        }
-        else
-        {
-            AddSettingsText("Anthropic API key (saved encrypted for your Windows account):", 12, bold: false, top: 4);
-            var key = new PasswordBox { Margin = new Thickness(0, 2, 0, 2) };
-            if (settings.ApiKeyProtected != "")
-            {
-                key.Password = "saved-key-hidden";
-            }
-            key.PasswordChanged += (sender, e) =>
-            {
-                if (key.Password != "saved-key-hidden")
-                {
-                    settings.SetApiKey(key.Password);
-                    settings.Save();
-                }
-            };
-            SettingsPanel.Children.Add(key);
-        }
-
-        AddSettingsText("Model:", 12, bold: false, top: 4);
-        var model = new TextBox { Text = settings.AiModel, Margin = new Thickness(0, 2, 0, 2) };
-        model.TextChanged += (sender, e) =>
-        {
-            settings.AiModel = model.Text.Trim() == "" ? AiPlanner.DefaultModel : model.Text.Trim();
-            settings.Save();
-        };
-        SettingsPanel.Children.Add(model);
-
-        if (settings.IgnoredWords.Count > 0)
-        {
-            var ignored = AddSettingsText($"{settings.IgnoredWords.Count} words ignored by the spelling check.", 12, bold: false, top: 6);
-            var clear = new Wpf.Ui.Controls.Button { Content = "Clear ignored words", Margin = new Thickness(0, 2, 0, 0) };
-            clear.Click += (sender, e) =>
-            {
-                settings.IgnoredWords.Clear();
-                settings.Save();
-                ignored.Text = "No words ignored.";
-                clear.IsEnabled = false;
-            };
-            SettingsPanel.Children.Add(clear);
-        }
     }
 
     private void AddSettingsOption(string name, string detail, bool isOn, Action<bool> set)
@@ -442,372 +321,6 @@ public partial class StepsPage : UserControl
         return block;
     }
 
-    // ---- AI mode: describe it, the AI proposes steps, the engine checks them ----
-
-    private static readonly HttpClient Http = new() { Timeout = TimeSpan.FromSeconds(120) };
-
-    // Connected only for this session, and only after the user says Yes
-    private bool aiConnected;
-    private bool aiBusy;
-    private TextBox? aiRequest;
-    private TextBlock? aiStatus;
-
-    private static readonly string AiHistoryFile = Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
-        "CADScriptBuilder", "ai-history.jsonl");
-
-    private void UpdateAiButton()
-    {
-        AiButton.Visibility = settings.AiEnabled ? Visibility.Visible : Visibility.Collapsed;
-        if (!settings.AiEnabled)
-        {
-            aiConnected = false;
-            AiPopup.IsOpen = false;
-        }
-    }
-
-    private void AiButton_Click(object sender, RoutedEventArgs e)
-    {
-        PopupToggle.Toggle(AiPopup, beforeOpen: BuildAiPanel);
-    }
-
-    private void BuildAiPanel()
-    {
-        AiPanel.Children.Clear();
-        AddAiText("Ask AI", 16, bold: true);
-
-        if (!aiConnected)
-        {
-            AddAiText("Describe what you want, e.g. \"freeze all the C-TEMP layers and make the road text 2.5 high\". " +
-                      "The AI proposes steps from the same blocks you use. It never writes the script.", 12, bold: false);
-            AddAiText("Connecting sends your request and this drawing's layer names, linetypes and text style names to " +
-                      "Anthropic. The drawing file, its geometry and its text are never sent.", 12, bold: false);
-
-            var connect = new Wpf.Ui.Controls.Button
-            {
-                Content = "Connect",
-                Appearance = ControlAppearance.Primary,
-                Margin = new Thickness(0, 8, 0, 0)
-            };
-            connect.Click += (sender, e) => ConnectAi();
-            AiPanel.Children.Add(connect);
-            return;
-        }
-
-        aiRequest ??= new TextBox
-        {
-            AcceptsReturn = true,
-            TextWrapping = TextWrapping.Wrap,
-            Height = 80,
-            Margin = new Thickness(0, 4, 0, 6)
-        };
-        AiPanel.Children.Add(aiRequest);
-
-        var buttons = new StackPanel { Orientation = Orientation.Horizontal };
-        var propose = new Wpf.Ui.Controls.Button
-        {
-            Content = "Propose steps",
-            Appearance = ControlAppearance.Primary,
-            IsEnabled = !aiBusy
-        };
-        propose.Click += async (sender, e) => await ProposeSteps(propose);
-        var history = new Wpf.Ui.Controls.Button
-        {
-            Content = "History",
-            Appearance = ControlAppearance.Transparent,
-            Margin = new Thickness(8, 0, 0, 0),
-            ToolTip = "Every request and what the AI proposed, kept in Documents\\CADScriptBuilder\\ai-history.jsonl"
-        };
-        history.Click += (sender, e) => OpenAiHistory();
-        var disconnect = new Wpf.Ui.Controls.Button
-        {
-            Content = "Disconnect",
-            Appearance = ControlAppearance.Transparent,
-            Margin = new Thickness(8, 0, 0, 0)
-        };
-        disconnect.Click += (sender, e) =>
-        {
-            aiConnected = false;
-            BuildAiPanel();
-        };
-        buttons.Children.Add(propose);
-        buttons.Children.Add(history);
-        buttons.Children.Add(disconnect);
-        AiPanel.Children.Add(buttons);
-
-        aiStatus = AddAiText(aiStatus?.Text ?? "Connected. Steps it proposes are checked like any other, and held back if they can't work.",
-            12, bold: false);
-        aiStatus.Margin = new Thickness(0, 8, 0, 0);
-        aiRequest.Focus();
-    }
-
-    // The yes/no gate: nothing is sent until the user agrees, once per session
-    private void ConnectAi()
-    {
-        if (settings.GetApiKey() is null)
-        {
-            AiPanel.Children.Clear();
-            AddAiText("Ask AI", 16, bold: true);
-            AddAiText("Add your Anthropic API key in ⚙ Settings (AI mode) first, then press ✨ again.", 12, bold: false);
-            return;
-        }
-
-        var answer = MessageBox.Show(
-            "Connect AI mode for this session?\n\n" +
-            "Each request sends what you type, plus this drawing's layer names and states, linetypes, " +
-            "text style names and linetype settings, to Anthropic's API.\n\n" +
-            "Never sent: the drawing file, its geometry, or the words in its text.\n\n" +
-            "The AI only proposes steps. They're checked here and previewed in Civil 3D before anything changes.",
-            "CADScriptBuilder: AI mode", MessageBoxButton.YesNo, MessageBoxImage.Question);
-        if (answer != MessageBoxResult.Yes)
-        {
-            return;
-        }
-
-        aiConnected = true;
-        BuildAiPanel();
-        AiPopup.IsOpen = true;
-    }
-
-    private async Task ProposeSteps(Wpf.Ui.Controls.Button propose)
-    {
-        var request = (aiRequest?.Text ?? "").Trim();
-        var key = settings.GetApiKey();
-        if (request == "" || aiBusy || key is null || aiStatus is null)
-        {
-            return;
-        }
-
-        aiBusy = true;
-        propose.IsEnabled = false;
-        aiStatus.Text = "Thinking…";
-
-        string explanation = "";
-        string reply = "";
-        var steps = new List<Operation>();
-        int added = 0, held = 0;
-        try
-        {
-            var body = AiPlanner.BuildRequest(request, after, settings.AiModel);
-            using var message = new HttpRequestMessage(HttpMethod.Post, AiPlanner.Endpoint)
-            {
-                Content = new StringContent(body, Encoding.UTF8, "application/json")
-            };
-            message.Headers.Add("x-api-key", key);
-            message.Headers.Add("anthropic-version", AiPlanner.ApiVersion);
-
-            using var response = await Http.SendAsync(message);
-            reply = await response.Content.ReadAsStringAsync();
-            if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
-            {
-                throw new InvalidDataException("The API key wasn't accepted. Check it in ⚙ Settings.");
-            }
-
-            (steps, explanation, var skipped) = AiPlanner.ParseResponse(reply);
-            if (steps.Count > 0)
-            {
-                (added, held) = TryAddSteps(steps);
-            }
-
-            var parts = new List<string> { explanation };
-            parts.Add(steps.Count == 0 ? "No steps proposed." :
-                $"Added {added} {(added == 1 ? "step" : "steps")}" + (held > 0 ? $", {held} held back (see the message below the list)." : "."));
-            if (skipped.Count > 0)
-            {
-                parts.Add($"Ignored {skipped.Count} unknown {(skipped.Count == 1 ? "step" : "steps")}.");
-            }
-            aiStatus.Text = string.Join(" ", parts.Where(p => p != ""));
-        }
-        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException)
-        {
-            aiStatus.Text = "Couldn't reach the AI service. Check your connection (or your firewall), then try again.";
-        }
-        catch (InvalidDataException ex)
-        {
-            aiStatus.Text = ex.Message;
-        }
-        finally
-        {
-            aiBusy = false;
-            propose.IsEnabled = true;
-        }
-
-        LogAi(request, explanation, steps, added, held);
-    }
-
-    // The history tracker: one line per request, so there's a record of what the AI suggested
-    private void LogAi(string request, string explanation, List<Operation> steps, int added, int held)
-    {
-        History.Add("AI", $"AI proposed {steps.Count} {(steps.Count == 1 ? "step" : "steps")} ({added} added{(held > 0 ? $", {held} held back" : "")})",
-            $"Asked: {request}", explanation);
-        try
-        {
-            var proposed = new Plan();
-            proposed.Operations.AddRange(steps);
-            var line = new JsonObject
-            {
-                ["time"] = DateTime.Now.ToString("s"),
-                ["drawing"] = scan.Drawing,
-                ["model"] = settings.AiModel,
-                ["request"] = request,
-                ["explanation"] = explanation,
-                ["added"] = added,
-                ["heldBack"] = held,
-                ["proposed"] = JsonNode.Parse(Engine.PlanToJson(proposed))
-            };
-            Directory.CreateDirectory(Path.GetDirectoryName(AiHistoryFile)!);
-            File.AppendAllText(AiHistoryFile, line.ToJsonString() + Environment.NewLine);
-        }
-        catch (IOException)
-        {
-            // The log is a convenience: never let it stop the work
-        }
-    }
-
-    private void OpenAiHistory()
-    {
-        if (!File.Exists(AiHistoryFile))
-        {
-            if (aiStatus is not null)
-            {
-                aiStatus.Text = "No history yet.";
-            }
-            return;
-        }
-        System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(AiHistoryFile) { UseShellExecute = true });
-    }
-
-    private TextBlock AddAiText(string text, double size, bool bold)
-    {
-        var block = new TextBlock
-        {
-            Text = text,
-            FontSize = size,
-            FontWeight = bold ? FontWeights.SemiBold : FontWeights.Normal,
-            TextWrapping = TextWrapping.Wrap,
-            Margin = new Thickness(0, 0, 0, 4)
-        };
-        block.SetResourceReference(TextBlock.ForegroundProperty,
-            bold ? "TextFillColorPrimaryBrush" : "TextFillColorSecondaryBrush");
-        AiPanel.Children.Add(block);
-        return block;
-    }
-
-    // ---- Standards check: layer naming and spelling ----
-
-    private void StandardsButton_Click(object sender, RoutedEventArgs e)
-    {
-        PopupToggle.Toggle(StandardsPopup, beforeOpen: BuildStandards);
-    }
-
-    // Checks the drawing as it'll be after the steps so far, so fixed things drop off the list
-    private void BuildStandards()
-    {
-        StandardsPanel.Children.Clear();
-        var naming = NamingStandard.Find(settings.NamingStandard, settings.CustomPattern);
-        var findings = StandardsCheck.Run(after, naming, settings.IgnoredWords);
-
-        AddStandardsText("Standards check", 16, bold: true);
-        AddStandardsText($"Layer naming: {naming.Name}. Change it in ⚙ Settings. Spelling: British English, offline.", 12, bold: false);
-        if (!after.KnowsContents)
-        {
-            AddStandardsText("Rescan the drawing (↻) to check the spelling of its text too.", 12, bold: false);
-        }
-
-        if (findings.Count == 0)
-        {
-            AddStandardsText("✔  Everything checks out.", 13, bold: true).Margin = new Thickness(0, 12, 0, 0);
-            return;
-        }
-
-        var fixable = findings.Where(f => f.Fix is not null).ToList();
-        var summary = AddStandardsText(
-            $"{findings.Count(f => f.Kind == "Naming")} naming, {findings.Count(f => f.Kind == "Spelling")} spelling. " +
-            "Fixes are added as steps, so you still see them all before anything runs.", 12, bold: false);
-        summary.Margin = new Thickness(0, 8, 0, 4);
-
-        if (fixable.Count > 1)
-        {
-            var all = new Wpf.Ui.Controls.Button
-            {
-                Content = $"Add all {fixable.Count} fixes",
-                Appearance = ControlAppearance.Primary,
-                Margin = new Thickness(0, 4, 0, 8)
-            };
-            all.Click += (sender, e) =>
-            {
-                TryAddSteps(fixable.Select(f => f.Fix!).ToList());
-                BuildStandards();
-            };
-            StandardsPanel.Children.Add(all);
-        }
-
-        foreach (var finding in findings)
-        {
-            var row = new DockPanel { Margin = new Thickness(0, 6, 0, 0) };
-            var buttons = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Top };
-            DockPanel.SetDock(buttons, Dock.Right);
-
-            if (finding.Fix is not null)
-            {
-                var fix = new Wpf.Ui.Controls.Button { Content = "Fix", Margin = new Thickness(8, 0, 0, 0), Padding = new Thickness(10, 4, 10, 4) };
-                fix.Click += (sender, e) =>
-                {
-                    TryAddSteps([finding.Fix]);
-                    BuildStandards();
-                };
-                buttons.Children.Add(fix);
-            }
-            if (finding.IgnoreWord is not null)
-            {
-                var ignore = new Wpf.Ui.Controls.Button
-                {
-                    Content = "Ignore",
-                    Appearance = ControlAppearance.Transparent,
-                    Margin = new Thickness(4, 0, 0, 0),
-                    Padding = new Thickness(10, 4, 10, 4),
-                    ToolTip = "Accept this word from now on (e.g. a project or place name)"
-                };
-                ignore.Click += (sender, e) =>
-                {
-                    settings.IgnoredWords.Add(finding.IgnoreWord);
-                    settings.Save();
-                    BuildStandards();
-                };
-                buttons.Children.Add(ignore);
-            }
-
-            var text = new TextBlock
-            {
-                Text = (finding.Kind == "Naming" ? "Layer  ·  " : "Spelling  ·  ") + finding.Message,
-                FontSize = 13,
-                TextWrapping = TextWrapping.Wrap,
-                VerticalAlignment = VerticalAlignment.Center
-            };
-            text.SetResourceReference(TextBlock.ForegroundProperty, "TextFillColorPrimaryBrush");
-
-            row.Children.Add(buttons);
-            row.Children.Add(text);
-            StandardsPanel.Children.Add(row);
-        }
-    }
-
-    private TextBlock AddStandardsText(string text, double size, bool bold)
-    {
-        var block = new TextBlock
-        {
-            Text = text,
-            FontSize = size,
-            FontWeight = bold ? FontWeights.SemiBold : FontWeights.Normal,
-            TextWrapping = TextWrapping.Wrap,
-            Margin = new Thickness(0, 0, 0, 4)
-        };
-        block.SetResourceReference(TextBlock.ForegroundProperty,
-            bold ? "TextFillColorPrimaryBrush" : "TextFillColorSecondaryBrush");
-        StandardsPanel.Children.Add(block);
-        return block;
-    }
-
     // ---- Refresh: re-sync with the drawing after it changes ----
 
     private void RefreshButton_Click(object sender, RoutedEventArgs e)
@@ -836,9 +349,9 @@ public partial class StepsPage : UserControl
 
         var folder = Path.GetDirectoryName(LayersFile)!;
         Directory.CreateDirectory(folder);
-        refreshWatcher = new FileSystemWatcher(folder, "*.txt");
-        refreshWatcher.Created += (sender, e) => Dispatcher.Invoke(() => FileChanged(e.Name));
-        refreshWatcher.Changed += (sender, e) => Dispatcher.Invoke(() => FileChanged(e.Name));
+        refreshWatcher = new FileSystemWatcher(folder, "layers.txt");
+        refreshWatcher.Created += (sender, e) => Dispatcher.Invoke(() => RestartRefreshTimer());
+        refreshWatcher.Changed += (sender, e) => Dispatcher.Invoke(() => RestartRefreshTimer());
         refreshWatcher.EnableRaisingEvents = true;
     }
 
@@ -853,62 +366,11 @@ public partial class StepsPage : UserControl
         }
     }
 
-    // layers.txt means a new scan; last-run.txt means a script finished (or was cancelled)
-    private void FileChanged(string? name)
-    {
-        if (string.Equals(name, "layers.txt", StringComparison.OrdinalIgnoreCase))
-        {
-            RestartRefreshTimer();
-        }
-        else if (string.Equals(name, "last-run.txt", StringComparison.OrdinalIgnoreCase))
-        {
-            runLogTimer.Stop();
-            runLogTimer.Start();
-        }
-    }
-
-    // Typing No in Civil 3D leaves the drawing alone, so there's no rescan: the run log says so instead
-    private void CheckRunLog()
-    {
-        runLogTimer.Stop();
-        var log = RunLog.Read(LastRunFile);
-        if (log is null || !log.Cancelled || log.RunId != lastRunId || handledRunId == log.RunId)
-        {
-            return;
-        }
-        handledRunId = log.RunId;
-        History.Add("Cancelled", "Cancelled in Civil 3D", "Nothing changed.");
-        History.SetSync(SyncState.WaitingForRun, "Cancelled in Civil 3D. Drag RUN in again to apply it.");
-    }
-
     // Wait half a second for Civil 3D to finish writing, then read the new scan
     private void RestartRefreshTimer()
     {
         refreshTimer.Stop();
         refreshTimer.Start();
-    }
-
-    // What the history panel shows for a rescan: a run (with what Civil 3D actually did) or a hand refresh
-    private void RecordRefresh(Scan fresh)
-    {
-        if (fresh.FromRun)
-        {
-            var log = RunLog.Read(LastRunFile);
-            bool ours = log is not null && log.RunId == lastRunId;
-            var lines = ours ? log!.Lines : lastRunSteps;
-            if (log is not null && log.RunId == handledRunId)
-            {
-                return;   // already recorded this run
-            }
-            handledRunId = log?.RunId ?? lastRunId;
-            History.Add("Run", $"Ran in Civil 3D on {fresh.Drawing}: {lines.Count} {(lines.Count == 1 ? "change" : "changes")}", lines);
-            History.SetSync(SyncState.Synced, $"Synced with {fresh.Drawing} straight after the run.");
-        }
-        else
-        {
-            History.Add("Refresh", $"Re-synced with {fresh.Drawing}", "Rescanned by hand (SCAN tile).");
-            History.SetSync(SyncState.Synced, $"Synced with {fresh.Drawing}.");
-        }
     }
 
     private void RefreshFromScan()
@@ -931,7 +393,6 @@ public partial class StepsPage : UserControl
         }
 
         RefreshPopup.IsOpen = false;
-        RecordRefresh(fresh);
 
         // Straight after a run, with "Clear steps after a run" on in Settings: start fresh
         if (fresh.FromRun && settings.ClearAfterRun && plan.Operations.Count > 0)
@@ -1092,16 +553,7 @@ public partial class StepsPage : UserControl
             }
 
             int index = editingIndex;
-            var edited = block.Make(first, second);
-
-            // Keep the settings the boxes don't show (e.g. whole words only, on one layer)
-            if (edited is ReplaceText newer && plan.Operations[index] is ReplaceText older)
-            {
-                newer.MatchCase = older.MatchCase;
-                newer.WholeWord = older.WholeWord;
-                newer.Layer = older.Layer;
-            }
-            plan.Operations[index] = edited;
+            plan.Operations[index] = block.Make(first, second);
             FirstBox.Text = "";
             SecondBox.Text = "";
             RefreshSteps();
@@ -1378,8 +830,6 @@ public partial class StepsPage : UserControl
         SetTextStyleFont f => (f.Style, f.Font),
         SetTextHeight h => (h.Layer, h.Height),
         SetTextStyleOnLayer s => (s.Layer, s.Style),
-        ReplaceText r => (r.Find, r.Replace),
-        UpperCaseText u => (u.Layer, ""),
         LayerSetting other => (other.Layer, ""),
         _ => ("", "")
     };
@@ -1528,7 +978,6 @@ public partial class StepsPage : UserControl
         }
 
         Engine.SavePlan(plan, dialog.FileName);
-        History.Add("Plan", $"Saved plan {Path.GetFileName(dialog.FileName)}", $"{plan.Operations.Count} steps.");
         SetStatus(InfoBarSeverity.Success, "Plan saved",
             $"Saved {plan.Operations.Count} steps as {Path.GetFileName(dialog.FileName)}. Open it on any drawing.");
     }
@@ -1554,7 +1003,6 @@ public partial class StepsPage : UserControl
             plan.Operations.Clear();
             plan.Operations.AddRange(loaded.Operations);
             RefreshSteps();
-            History.Add("Plan", $"Opened plan {Path.GetFileName(dialog.FileName)}", $"{loaded.Operations.Count} steps.");
         }
         catch (InvalidDataException ex)
         {
@@ -1570,10 +1018,8 @@ public partial class StepsPage : UserControl
             return;
         }
 
-        int removed = plan.Operations.Count;
         plan.Operations.Clear();
         RefreshSteps();
-        History.Add("Steps", "Cleared all steps", $"{removed} {(removed == 1 ? "step" : "steps")} removed.");
         SetStatus(InfoBarSeverity.Informational, "Cleared", "All steps removed. Ready for a new script.");
     }
 
@@ -1589,10 +1035,6 @@ public partial class StepsPage : UserControl
         if (File.Exists(runScript))
         {
             File.Delete(runScript);
-        }
-        if (History.Sync == SyncState.WaitingForRun)
-        {
-            History.SetSync(SyncState.Synced, "Steps changed, so the unrun script was discarded.");
         }
 
         CancelPending();
@@ -1671,22 +1113,9 @@ public partial class StepsPage : UserControl
         }
 
         Directory.CreateDirectory(Path.GetDirectoryName(runScript)!);
-        var runId = Guid.NewGuid().ToString("N")[..8];
-        try
-        {
-            File.WriteAllText(runScript, Engine.BuildLisp(plan, scan, runId));
-        }
-        catch (InvalidDataException ex)
-        {
-            SetStatus(InfoBarSeverity.Error, "Couldn't make the script", ex.Message);
-            return;
-        }
+        File.WriteAllText(runScript, Engine.BuildLisp(plan, scan));
 
         RunTile.Visibility = Visibility.Visible;
-        lastRunId = runId;
-        lastRunSteps = plan.Operations.Select(op => op.Done()).ToList();
-        History.Add("Script", $"Script made: {plan.Operations.Count} {(plan.Operations.Count == 1 ? "step" : "steps")}", lastRunSteps);
-        History.SetSync(SyncState.WaitingForRun, "Script ready: drag RUN into Civil 3D and type Yes.");
         SetStatus(InfoBarSeverity.Success, "Script ready",
             "Drag the RUN tile into Civil 3D. Answer Yes to apply, then U once to undo.");
     }

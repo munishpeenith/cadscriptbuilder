@@ -18,8 +18,8 @@ public class SetTextStyleFont : Operation
 
     public override string ToLisp() => $"(setq {ResultName()} (csb-style-font {Lisp.Quote(Style)} {Lisp.Quote(Font)}))";
 
-    public override string SummaryText(IEnumerable<Operation> later) =>
-        $"""(if {ResultName()} "\n  - Text style {Lisp.Escape(Style)} now uses {Lisp.Escape(Font)}" "\n  - Text style {Lisp.Escape(Style)} NOT changed: AutoCAD couldn't use the font {Lisp.Escape(Font)}")""";
+    public override string SummaryLisp(IEnumerable<Operation> later) =>
+        $"""(princ (if {ResultName()} "\n  - Text style {Lisp.Escape(Style)} now uses {Lisp.Escape(Font)}" "\n  - Text style {Lisp.Escape(Style)} NOT changed: AutoCAD couldn't use the font {Lisp.Escape(Font)}"))""";
 
     public override CheckResult Check(DrawingState drawing)
     {
@@ -63,8 +63,8 @@ public class SetTextHeight : LayerSetting
                $"(function (lambda (o) (if (= (vla-get-objectname o) \"AcDbMLeader\") (vla-put-textheight o {h}) (vla-put-height o {h}))))))";
     }
 
-    public override string SummaryText(IEnumerable<Operation> later) =>
-        $"""(strcat "\n  - Text height {Lisp.Escape(Height)} on {Lisp.Escape(Layer)}: " (csb-count {ResultName()} "texts"))""";
+    public override string SummaryLisp(IEnumerable<Operation> later) =>
+        $"""(princ (strcat "\n  - Text height {Lisp.Escape(Height)} on {Lisp.Escape(Layer)}: " (csb-count {ResultName()} "texts")))""";
 
     protected override void CheckMore(DrawingState drawing, CheckResult result)
     {
@@ -97,8 +97,8 @@ public class SetTextStyleOnLayer : LayerSetting
                $"(function (lambda (o) (if (= (vla-get-objectname o) \"AcDbMLeader\") (vla-put-textstylename o {style}) (vla-put-stylename o {style}))))))";
     }
 
-    public override string SummaryText(IEnumerable<Operation> later) =>
-        $"""(strcat "\n  - Text style {Lisp.Escape(Style)} on {Lisp.Escape(Layer)}: " (csb-count {ResultName()} "texts"))""";
+    public override string SummaryLisp(IEnumerable<Operation> later) =>
+        $"""(princ (strcat "\n  - Text style {Lisp.Escape(Style)} on {Lisp.Escape(Layer)}: " (csb-count {ResultName()} "texts")))""";
 
     protected override void CheckMore(DrawingState drawing, CheckResult result)
     {

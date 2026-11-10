@@ -26,8 +26,6 @@ namespace Core;
 [JsonDerivedType(typeof(SetTextStyleFont), "setTextStyleFont")]
 [JsonDerivedType(typeof(SetTextHeight), "setTextHeight")]
 [JsonDerivedType(typeof(SetTextStyleOnLayer), "setTextStyleOnLayer")]
-[JsonDerivedType(typeof(ReplaceText), "replaceText")]
-[JsonDerivedType(typeof(UpperCaseText), "upperCaseText")]
 public abstract class Operation
 {
     // Which step this is in the script (set while building it). Steps that count what they changed
@@ -39,9 +37,6 @@ public abstract class Operation
 
     // True for steps whose change only shows after a regen (linetype scales, text styles)
     public virtual bool NeedsRegen() => false;
-
-    // True for steps that work out their exact changes from the scan (text edits)
-    public virtual bool NeedsScan() => false;
 
     // Which block this step came from. Usually its type, but one type can serve several blocks.
     public virtual string Kind() => GetType().Name;
@@ -59,7 +54,5 @@ public abstract class Operation
 
     // The LISP that prints this step's line in the after-run summary.
     // "later" is the steps that come after this one (some summaries need to know).
-    // A LISP expression giving one line of the after-run summary, e.g. "\n  - Purged C-OLD".
-    // The script prints it, and also saves it to last-run.txt so the app's history can show it.
-    public virtual string SummaryText(IEnumerable<Operation> later) => "\"\\n  - " + Lisp.Escape(Done()) + "\"";
+    public virtual string SummaryLisp(IEnumerable<Operation> later) => $"""(princ "\n  - {Lisp.Escape(Done())}")""";
 }
